@@ -14,6 +14,8 @@ from collections import namedtuple
 
 signal_type = namedtuple('Signal', ['name', 'value'])
 
+comands = {'Channel 1 power': {'comand num': ['5'], 'state': ['0', '1']},
+           'Set filter': {'comand num': ['4'], 'Low': ['BP1(0x01)', 'BP2(0x02)'], 'Hight': ['BP1(0x01)', 'BP2(0x02)']}}
 
 class SP(QWidget):
     signal = pyqtSignal(signal_type)
@@ -145,16 +147,23 @@ class CustomCmd(QWidget):
         self.setLayout(self.main_layout)
         self.main_layout.addWidget(self.cmdtree)
         self.model = QStandardItemModel()
-        self.item = QStandardItem("Пример")
-        it1 = QStandardItem("it1")
-        it2 = QStandardItem("it2")
-        it3 = QStandardItem("it3")
-        self.item.appendColumn([it1, it2, it3])
-        self.model.appendRow([self.item,])
         self.cmdtree.setModel(self.model)
+        self.model.setHorizontalHeaderLabels(['Names', 'Value'])
+        for name, cmd in comands.items():
+            list_name = QStandardItem(name)
+            for bit_name, bit_value in cmd.items():
+                combo = QComboBox()
+                combo.addItems(bit_value)
+                col1 = QStandardItem(bit_name)
+                col2 = QStandardItem()
+                list_name.appendRow([col1, col2])
+                xIndex = self.model.indexFromItem(col2)
+                self.cmdtree.setIndexWidget(xIndex, combo)
+
+            self.model.appendRow(list_name)
+
+
         print(self.cmdtree.currentIndex())
-
-
 
 
 class MainWindow(QMainWindow):
@@ -193,7 +202,6 @@ class MainWindow(QMainWindow):
         self.doker_cmd.setWidget(self.cmd)
         self.addDockWidget(Qt.BottomDockWidgetArea, self.doker_cmd)
         self.view_menu.addAction(self.doker_cmd.toggleViewAction())
-
 
     def sp_signal_handling(self, signal):
         print(signal.name, signal.value)
