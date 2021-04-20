@@ -14,8 +14,25 @@ from collections import namedtuple
 
 signal_type = namedtuple('Signal', ['name', 'value'])
 
-comands = {'Channel 1 power': {'comand num': ['5'], 'state': ['0', '1']},
-           'Set filter': {'comand num': ['4'], 'Low': ['BP1(0x01)', 'BP2(0x02)'], 'Hight': ['BP1(0x01)', 'BP2(0x02)']}}
+comands = {
+    'Channel 1 power':
+        {
+            'comand num': '5',
+            'state': ['0', '1']
+        },
+    'Channel 2 power':
+        {
+            'comand num': '6',
+            'state': ['0', '1']
+        },
+    'Set filter':
+        {
+            'comand num': '4',
+            'Low': ['BP1(0x01)', 'BP2(0x02)'],
+            'Hight': ['BP1(0x01)', 'BP2(0x02)', 'BP3(0x03)', 'BP4(0x04)']
+        }
+}
+
 
 class SP(QWidget):
     signal = pyqtSignal(signal_type)
@@ -136,6 +153,7 @@ class UrpControl(QWidget):
         self.main_layout.addWidget(self.l_band)
         self.main_layout.addWidget(self.sp_band)
 
+
 class CustomCmd(QWidget):
     def __init__(self):
         super().__init__()
@@ -149,21 +167,37 @@ class CustomCmd(QWidget):
         self.model = QStandardItemModel()
         self.cmdtree.setModel(self.model)
         self.model.setHorizontalHeaderLabels(['Names', 'Value'])
-        for name, cmd in comands.items():
-            list_name = QStandardItem(name)
+        for cmd_name, cmd in comands.items():
+            btn_send = QPushButton('Send')
+            btn_send.setStyleSheet('background-color: grey;'
+                                   'border-style: outset;'
+                                   'order-width: 2px;'
+                                   'border-radius: 7px;'
+                                   'border-color: beige;'
+                                   'font: bold 12px;'
+                                   'color: white;'
+                                   'padding: 4px;')
+            list_name = QStandardItem(cmd_name)
+            send_itm = QStandardItem()
+
             for bit_name, bit_value in cmd.items():
-                combo = QComboBox()
-                combo.addItems(bit_value)
                 col1 = QStandardItem(bit_name)
-                col2 = QStandardItem()
-                list_name.appendRow([col1, col2])
-                xIndex = self.model.indexFromItem(col2)
-                self.cmdtree.setIndexWidget(xIndex, combo)
+                if type(bit_value) == list:
+                    col2 = QStandardItem()
+                    list_name.appendRow([col1, col2])
+                    combo = QComboBox()
+                    combo.addItems(bit_value)
+                    cb_index = self.model.indexFromItem(col2)
+                    self.cmdtree.setIndexWidget(cb_index, combo)
+                else:
+                    col2 = QStandardItem(bit_value)
+                    list_name.appendRow([col1, col2])
 
-            self.model.appendRow(list_name)
-
-
-        print(self.cmdtree.currentIndex())
+            self.model.appendRow([list_name, send_itm])
+            btn_index = self.model.indexFromItem(send_itm)
+            btn_send.clicked.connect(lambda: print(btn_index.internalId()))
+            self.cmdtree.setIndexWidget(btn_index, btn_send)
+            self.model.
 
 
 class MainWindow(QMainWindow):
