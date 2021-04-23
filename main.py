@@ -2,11 +2,12 @@ import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QComboBox, QLabel, QTextEdit, QDockWidget,
                              QListWidget, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget, QPushButton,
                              QSpinBox, QCheckBox, QSlider, QGroupBox, QSpacerItem, QSizePolicy, QMenu, QLCDNumber,
-                             QTreeWidget, QTreeWidgetItem, QTreeView, QStyledItemDelegate, QAbstractItemView, QStyleOptionButton)
-
-from PyQt5.QtCore import Qt, pyqtSignal, QIODevice, QRect
+                             QTreeWidget, QTreeWidgetItem, QTreeView)
+from PyQt5.QtCore import Qt, pyqtSignal, QIODevice, QSignalMapper
 import time
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPalette, QIcon, QColor
+from PyQt5.QtGui import QStandardItemModel, QStandardItem
+
+from PyQt5.QtGui import QPalette, QIcon, QColor
 
 import SerialPortDriver
 from collections import namedtuple
@@ -15,23 +16,10 @@ signal_type = namedtuple('Signal', ['name', 'value'])
 
 comands = {
     'Channel 1 power':
-        {
-            'comand num': '5',
-            'state': ['0', '1']
-        },
-    'Channel 2 power':
-        {
-            'comand num': '6',
-            'state': ['0', '1']
-        },
+        {'comand num': ['5'], 'state': ['0', '1']},
     'Set filter':
-        {
-            'comand num': '4',
-            'Low': ['BP1(0x01)', 'BP2(0x02)'],
-            'Hight': ['BP1(0x01)', 'BP2(0x02)', 'BP3(0x03)', 'BP4(0x04)']
-        }
+        {'comand num': ['4'], 'Low': ['BP1(0x01)', 'BP2(0x02)'], 'Hight': ['BP1(0x01)', 'BP2(0x02)']}
 }
-
 
 class SP(QWidget):
     signal = pyqtSignal(signal_type)
@@ -152,46 +140,6 @@ class UrpControl(QWidget):
         self.main_layout.addWidget(self.l_band)
         self.main_layout.addWidget(self.sp_band)
 
-class Delegate(QStyledItemDelegate):
-    def __init__(self, owner, choices):
-        super().__init__(owner)
-        self.items = choices
-
-    def paint(self, painter, option, index):
-        if isinstance(self.parent(), QAbstractItemView):
-            self.parent().openPersistentEditor(index)
-        super(Delegate, self).paint(painter, option, index)
-
-    def createEditor(self, parent, option, index):
-        editor = QComboBox(parent)
-        editor.currentIndexChanged.connect(self.commit_editor)
-        editor.addItems(self.items)
-        return editor
-
-    def commit_editor(self):
-        editor = self.sender()
-        self.commitData.emit(editor)
-
-    def setEditorData(self, editor, index):
-        value = index.data(Qt.DisplayRole)
-        num = self.items.index(value)
-        editor.setCurrentIndex(num)
-
-    def setModelData(self, editor, model, index):
-        value = editor.currentText()
-        model.setData(index, value, Qt.EditRole)
-
-    def updateEditorGeometry(self, editor, option, index):
-        editor.setGeometry(option.rect)
-
-
-class ButtonDelegate(QStyledItemDelegate):
-    def paint(self, painter, option, index):
-        QStyledItemDelegate.paint(self, painter, option, index)
-        if index.model().hasChildren(index):
-            return
-
-
 class CustomCmd(QWidget):
     signal = pyqtSignal(signal_type)
     def __init__(self):
@@ -206,11 +154,16 @@ class CustomCmd(QWidget):
         self.model = QStandardItemModel()
         self.cmdtree.setModel(self.model)
         self.model.setHorizontalHeaderLabels(['Names', 'Value'])
-
+        self.mapper = QSignalMapper()
         i = 0
         for cmd_name, cmd in comands.items():
-            i += 1
-            btn_send = QPushButton('Send ' + str(i))
+            cmd_name_item = QStandardItem(cmd_name)
+            send_btn_item = QStandardItem()
+            self.model.appendRow([cmd_name_item, send_btn_item])
+
+            btn_send = QPushButton('Send')
+            self.mapper.setMapping(btn_send, i)
+            btn_send.clicked.connect(self.mapper.map)
             # btn_send.setStyleSheet('background-color: grey;'
             #                        'border-style: outset;'
             #                        'order-width: 2px;'
@@ -219,13 +172,11 @@ class CustomCmd(QWidget):
             #                        'font: bold 12px;'
             #                        'color: white;'
             #                        'padding: 4px;')
-            cmd_name_item = QStandardItem(cmd_name)
-            send_btn_item = QStandardItem()
-            self.model.appendRow([cmd_name_item, send_btn_item])
+
             btn_index = self.model.indexFromItem(send_btn_item)
             self.cmdtree.setIndexWidget(btn_index, btn_send)
             self.cmdtree.setColumnWidth(0, 300)
-
+            i += 1
 
             for bit_name, bit_value in cmd.items():
                 col1 = QStandardItem(bit_name)
@@ -240,8 +191,10 @@ class CustomCmd(QWidget):
                     col2 = QStandardItem(bit_value)
                     cmd_name_item.appendRow([col1, col2])
 
-        self.cmdtree.setItemDelegateForColumn(2, ButtonDelegate())
+        self.mapper.mapped[int].connect(self.btn_press)
 
+    def btn_press(self, num):
+        self.signal.emit(signal_type('btn_pressed', str(num)))
 
 
 class MainWindow(QMainWindow):
@@ -254,7 +207,7 @@ class MainWindow(QMainWindow):
         self.create_urp_docker()
         self.create_cmd_docker()
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
-        self.cmd.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
+        self.cmd.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
         self.urp.sp_band.valueChanged.connect(self.set_band)
 
     def set_band(self):
@@ -284,6 +237,12 @@ class MainWindow(QMainWindow):
 
     def sp_signal_handling(self, signal):
         print(signal.name, signal.value)
+        if signal.name == 'cmd':
+            print(self.cmd.cmdtree.currentIndex().row())
+
+    def cmd_signal_handling(self, signal):
+        print(signal.name, signal.value)
+        print(self.cmd.model.item(int(signal.value), 0).text())
 
 
 if __name__ == '__main__':

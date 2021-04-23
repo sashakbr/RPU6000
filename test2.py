@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QComboBox, QLabel, QText
                              QSpinBox, QCheckBox, QSlider, QGroupBox, QSpacerItem, QSizePolicy, QMenu, QLCDNumber,
                              QTreeWidget, QTreeWidgetItem, QTreeView, QStyledItemDelegate, QAbstractItemView, QStyleOptionButton)
 
-from PyQt5.QtCore import Qt, pyqtSignal, QIODevice, QRect
+from PyQt5.QtCore import Qt, pyqtSignal, QIODevice, QRect, QSignalMapper
 import time
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QPalette, QIcon, QColor
 
@@ -222,17 +222,21 @@ class CustomCmd(QWidget):
         # self.btns[1].clicked.connect(lambda: print('1'))
         # self.btns[2].clicked.connect(lambda: print('2'))
 
-        for _ in range(len(self.items)):
-            self.events.append(lambda: print(str(_)))
+        args = [1, 2, 3]
+        for _ in args:
+            self.events.append(lambda : print(str(_)))
+
+        self.mapper = QSignalMapper()
+            #self.events.append(lambda: self.signal.emit(signal_type('btn', qwe[_])))
 
         for _ in range(len(self.items)):
             self.cmd_tree.setItemWidget(self.items[_], 0, self.btns[_])
-            #self.btns[_].clicked.connect(self.events[_])
-            # self.events[_]()
-            self.btns[_].clicked.connect(self.signal.emit(signal_type('clicked', str(self.btns[_].text()))))
+            self.mapper.setMapping(self.btns[_], _)
+            self.btns[_].clicked.connect(self.mapper.map)
+        self.mapper.mapped[int].connect(self.btn_press)
 
-        for _ in range(len(self.items)):
-            self.cmd_tree.setItemWidget(self.items[_], 0, self.btns[_])
+    def btn_press(self, num):
+        self.signal.emit(signal_type('btn_pressed', str(num)))
 
 
 
@@ -276,6 +280,8 @@ class MainWindow(QMainWindow):
 
     def sp_signal_handling(self, signal):
         print(signal.name, signal.value)
+        if signal.name == 'btn':
+            print(self.cmd.cmd_tree.selectedItems()[0].text())
 
 
 if __name__ == '__main__':
