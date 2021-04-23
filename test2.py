@@ -1,3 +1,4 @@
+import copy
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QComboBox, QLabel, QTextEdit, QDockWidget,
                              QListWidget, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget, QPushButton,
@@ -199,48 +200,39 @@ class CustomCmd(QWidget):
         self.__create_widgets()
 
     def __create_widgets(self):
-        self.cmdtree = QTreeView()
+        self.cmd_tree = QTreeWidget()
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
-        self.main_layout.addWidget(self.cmdtree)
-        self.model = QStandardItemModel()
-        self.cmdtree.setModel(self.model)
-        self.model.setHorizontalHeaderLabels(['Names', 'Value'])
-
-        i = 0
+        self.main_layout.addWidget(self.cmd_tree)
+        self.items = []
+        self.btns = []
+        # self.events = [lambda: print('0'), lambda: print('1'), lambda: print('2')]
+        self.events = []
         for cmd_name, cmd in comands.items():
-            i += 1
-            btn_send = QPushButton('Send ' + str(i))
-            # btn_send.setStyleSheet('background-color: grey;'
-            #                        'border-style: outset;'
-            #                        'order-width: 2px;'
-            #                        'border-radius: 7px;'
-            #                        'border-color: beige;'
-            #                        'font: bold 12px;'
-            #                        'color: white;'
-            #                        'padding: 4px;')
-            cmd_name_item = QStandardItem(cmd_name)
-            send_btn_item = QStandardItem()
-            self.model.appendRow([cmd_name_item, send_btn_item])
-            btn_index = self.model.indexFromItem(send_btn_item)
-            self.cmdtree.setIndexWidget(btn_index, btn_send)
-            self.cmdtree.setColumnWidth(0, 300)
+            cmd_name_item = QTreeWidgetItem()
+            cmd_name_item.setText(0, cmd_name)
+            self.items.append(cmd_name_item)
+            self.btns.append(QPushButton(cmd_name))
+        self.cmd_tree.addTopLevelItems(self.items)
 
+        # self.cmd_tree.setItemWidget(self.items[0], 0, self.btns[0])
+        # self.cmd_tree.setItemWidget(self.items[1], 0, self.btns[1])
+        # self.cmd_tree.setItemWidget(self.items[2], 0, self.btns[2])
+        # self.btns[0].clicked.connect(lambda: print('0'))
+        # self.btns[1].clicked.connect(lambda: print('1'))
+        # self.btns[2].clicked.connect(lambda: print('2'))
 
-            for bit_name, bit_value in cmd.items():
-                col1 = QStandardItem(bit_name)
-                if type(bit_value) == list:
-                    col2 = QStandardItem()
-                    cmd_name_item.appendRow([col1, col2])
-                    combo = QComboBox()
-                    combo.addItems(bit_value)
-                    cb_index = self.model.indexFromItem(col2)
-                    self.cmdtree.setIndexWidget(cb_index, combo)
-                else:
-                    col2 = QStandardItem(bit_value)
-                    cmd_name_item.appendRow([col1, col2])
+        for _ in range(len(self.items)):
+            self.events.append(lambda: print(str(_)))
 
-        self.cmdtree.setItemDelegateForColumn(2, ButtonDelegate())
+        for _ in range(len(self.items)):
+            self.cmd_tree.setItemWidget(self.items[_], 0, self.btns[_])
+            #self.btns[_].clicked.connect(self.events[_])
+            # self.events[_]()
+            self.btns[_].clicked.connect(self.signal.emit(signal_type('clicked', str(self.btns[_].text()))))
+
+        for _ in range(len(self.items)):
+            self.cmd_tree.setItemWidget(self.items[_], 0, self.btns[_])
 
 
 
