@@ -14,12 +14,21 @@ from collections import namedtuple
 
 signal_type = namedtuple('Signal', ['name', 'value'])
 
-comands = {
-    'Channel 1 power':
-        {'comand num': ['5'], 'state': ['0', '1']},
-    'Set filter':
-        {'comand num': ['4'], 'Low': ['BP1(0x01)', 'BP2(0x02)'], 'Hight': ['BP1(0x01)', 'BP2(0x02)']}
-}
+comands =\
+    {
+        'Channel 1 power':
+            {
+                'Comand num': {'5': 5},
+                'Power': {'Off': 0, 'On': 1}
+            },
+
+        'Set filter':
+            {
+                'Comand num': {'4': 4},
+                'Low': {'BF1 30-90MHz': 0x01, 'BF2 90-120MHz': 0x02, 'BF3 120-210MHz': 0x03},
+                'Hight': {'BF1 30-90MHz': 0x01, 'BF2 90-120MHz': 0x02, 'BF3 120-210MHz': 0x03},
+            }
+    }
 
 class SP(QWidget):
     signal = pyqtSignal(signal_type)
@@ -140,56 +149,64 @@ class UrpControl(QWidget):
         self.main_layout.addWidget(self.l_band)
         self.main_layout.addWidget(self.sp_band)
 
+
 class CustomCmd(QWidget):
     signal = pyqtSignal(signal_type)
+
     def __init__(self):
         super().__init__()
         self.__create_widgets()
+        self.fill_tree()
 
     def __create_widgets(self):
         self.cmdtree = QTreeView()
+        self.cmdtree.setColumnWidth(0, 200)
+        self.cmdtree.setColumnWidth(1, 150)
+
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
         self.main_layout.addWidget(self.cmdtree)
         self.model = QStandardItemModel()
         self.cmdtree.setModel(self.model)
-        self.model.setHorizontalHeaderLabels(['Names', 'Value'])
+        self.model.setHorizontalHeaderLabels(['Names', 'Value', 'Send buttons'])
         self.mapper = QSignalMapper()
+
+
+    def fill_tree(self):
         i = 0
         for cmd_name, cmd in comands.items():
+
             cmd_name_item = QStandardItem(cmd_name)
+            space = QStandardItem()
             send_btn_item = QStandardItem()
-            self.model.appendRow([cmd_name_item, send_btn_item])
+            self.model.appendRow([cmd_name_item, space, send_btn_item])
 
             btn_send = QPushButton('Send')
             self.mapper.setMapping(btn_send, i)
+            i += 1
             btn_send.clicked.connect(self.mapper.map)
-            # btn_send.setStyleSheet('background-color: grey;'
-            #                        'border-style: outset;'
-            #                        'order-width: 2px;'
-            #                        'border-radius: 7px;'
-            #                        'border-color: beige;'
-            #                        'font: bold 12px;'
-            #                        'color: white;'
-            #                        'padding: 4px;')
+            btn_send.setStyleSheet('background-color: grey;'
+                                   'border-style: outset;'
+                                   'order-width: 2px;'
+                                   'border-radius: 7px;'
+                                   'border-color: beige;'
+                                   'font: bold 12px;'
+                                   'color: white;'
+                                   'padding: 4px;')
 
             btn_index = self.model.indexFromItem(send_btn_item)
             self.cmdtree.setIndexWidget(btn_index, btn_send)
-            self.cmdtree.setColumnWidth(0, 300)
-            i += 1
 
             for bit_name, bit_value in cmd.items():
-                col1 = QStandardItem(bit_name)
-                if type(bit_value) == list:
-                    col2 = QStandardItem()
-                    cmd_name_item.appendRow([col1, col2])
+                byte_name_item = QStandardItem(bit_name)
+                if type(bit_value) == dict:
+                    byte_value_item = QStandardItem()
+                    cmd_name_item.appendRow([byte_name_item, byte_value_item])
                     combo = QComboBox()
-                    combo.addItems(bit_value)
-                    cb_index = self.model.indexFromItem(col2)
+                    for text_, data_ in bit_value.items():
+                        combo.addItem(text_, data_)
+                    cb_index = self.model.indexFromItem(byte_value_item)
                     self.cmdtree.setIndexWidget(cb_index, combo)
-                else:
-                    col2 = QStandardItem(bit_value)
-                    cmd_name_item.appendRow([col1, col2])
 
         self.mapper.mapped[int].connect(self.btn_press)
 
@@ -241,8 +258,14 @@ class MainWindow(QMainWindow):
             print(self.cmd.cmdtree.currentIndex().row())
 
     def cmd_signal_handling(self, signal):
-        print(signal.name, signal.value)
         print(self.cmd.model.item(int(signal.value), 0).text())
+        item = self.cmd.model.item(int(signal.value), 0)
+        if item.hasChildren():
+            for i in range(item.rowCount()):
+                child_item = item.child(i, 1)
+                index_ = self.cmd.model.indexFromItem(child_item)
+                widget_ = self.cmd.cmdtree.indexWidget(index_)
+                print(widget_.currentText(), widget_.currentData())
 
 
 if __name__ == '__main__':
