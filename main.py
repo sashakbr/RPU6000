@@ -19,7 +19,7 @@ comands =\
         'Channel 1 power':
             {
                 'Comand num': {'5': 5},
-                'Power': {'Off': 0, 'On': 1}
+                'Power': {'Off': 0, 'On': 1},
             },
 
         'Set filter':
@@ -160,15 +160,12 @@ class CustomCmd(QWidget):
 
     def __create_widgets(self):
         self.cmdtree = QTreeView()
-        self.cmdtree.setColumnWidth(0, 200)
-        self.cmdtree.setColumnWidth(1, 150)
-
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
         self.main_layout.addWidget(self.cmdtree)
         self.model = QStandardItemModel()
-        self.cmdtree.setModel(self.model)
         self.model.setHorizontalHeaderLabels(['Names', 'Value', 'Send buttons'])
+        self.cmdtree.setModel(self.model)
         self.mapper = QSignalMapper()
 
 
@@ -210,17 +207,20 @@ class CustomCmd(QWidget):
 
         self.mapper.mapped[int].connect(self.btn_press)
 
+        self.cmdtree.setColumnWidth(0, 200)
+        self.cmdtree.setColumnWidth(1, 150)
+
     def btn_press(self, num):
-        self.signal.emit(signal_type('btn_pressed', str(num)))
+        self.signal.emit(signal_type('btn_pressed', num))
 
 
 class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.resize(600, 800)
+        self.resize(800, 600)
         self.view_menu = self.menuBar().addMenu("&View")
-        self.create_sp_docker()
+        self.create_sp()
         self.create_urp_docker()
         self.create_cmd_docker()
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
@@ -235,21 +235,19 @@ class MainWindow(QMainWindow):
         self.urp = UrpControl()
         self.docker_urp = QDockWidget('URP', self)
         self.docker_urp.setWidget(self.urp)
-        self.addDockWidget(Qt.RightDockWidgetArea, self.docker_urp)
+        self.addDockWidget(Qt.BottomDockWidgetArea, self.docker_urp)
         self.view_menu.addAction(self.docker_urp.toggleViewAction())
 
-    def create_sp_docker(self):
+    def create_sp(self):
         self.sp = SP()
-        self.doker_sp = QDockWidget('Serial port', self)
-        self.doker_sp.setWidget(self.sp)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.doker_sp)
-        self.view_menu.addAction(self.doker_sp.toggleViewAction())
+        self.setCentralWidget(self.sp)
+
 
     def create_cmd_docker(self):
         self.cmd = CustomCmd()
         self.doker_cmd = QDockWidget('Comand', self)
         self.doker_cmd.setWidget(self.cmd)
-        self.addDockWidget(Qt.BottomDockWidgetArea, self.doker_cmd)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.doker_cmd)
         self.view_menu.addAction(self.doker_cmd.toggleViewAction())
 
     def sp_signal_handling(self, signal):
@@ -258,8 +256,8 @@ class MainWindow(QMainWindow):
             print(self.cmd.cmdtree.currentIndex().row())
 
     def cmd_signal_handling(self, signal):
-        print(self.cmd.model.item(int(signal.value), 0).text())
-        item = self.cmd.model.item(int(signal.value), 0)
+        print(self.cmd.model.item(signal.value, 0).text())
+        item = self.cmd.model.item(signal.value, 0)
         if item.hasChildren():
             for i in range(item.rowCount()):
                 child_item = item.child(i, 1)
