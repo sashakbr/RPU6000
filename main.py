@@ -2,8 +2,8 @@ import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QComboBox, QLabel, QTextEdit, QDockWidget,
                              QListWidget, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget, QPushButton,
                              QSpinBox, QCheckBox, QSlider, QGroupBox, QSpacerItem, QSizePolicy, QMenu, QLCDNumber,
-                             QTreeWidget, QTreeWidgetItem, QTreeView)
-from PyQt5.QtCore import Qt, pyqtSignal, QIODevice, QSignalMapper
+                             QTreeWidget, QTreeWidgetItem, QTreeView, QFileDialog)
+from PyQt5.QtCore import Qt, pyqtSignal, QSignalMapper
 import time
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 
@@ -29,6 +29,7 @@ comands =\
                 'Hight': {'BF1 30-90MHz': 0x01, 'BF2 90-120MHz': 0x02, 'BF3 120-210MHz': 0x03},
             }
     }
+
 
 class SP(QWidget):
     signal = pyqtSignal(signal_type)
@@ -159,15 +160,40 @@ class CustomCmd(QWidget):
         self.fill_tree()
 
     def __create_widgets(self):
-        self.cmdtree = QTreeView()
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
-        self.main_layout.addWidget(self.cmdtree)
+
+        self.cmdtree = QTreeView()
         self.model = QStandardItemModel()
         self.model.setHorizontalHeaderLabels(['Names', 'Value', 'Send buttons'])
         self.cmdtree.setModel(self.model)
         self.mapper = QSignalMapper()
 
+        file_group = QGroupBox('File: ')
+        self.file_path_lable = QLabel('Path: ')
+        self.file_dialog_btn = QPushButton('Open')
+        self.file_dialog_btn.setFixedSize(80, 40)
+        self.file_dialog_btn.clicked.connect(self.open_file_dialog)
+        file_layout = QHBoxLayout()
+        file_layout.addWidget(self.file_path_lable)
+        file_layout.addWidget(self.file_dialog_btn)
+        file_group.setLayout(file_layout)
+
+        prefix_group = QGroupBox('Command prefix')
+        self.prefix_check = QCheckBox('Off')
+        self.prefix_check.clicked.connect(self.prefix_check_clicked)
+        self.prefix_value = QSpinBox()
+        self.prefix_value.setEnabled(False)
+        prefix_layout = QHBoxLayout()
+        prefix_layout.addWidget(self.prefix_check)
+        prefix_layout.addWidget(self.prefix_value)
+        prefix_group.setLayout(prefix_layout)
+        prefix_layout.addWidget(prefix_group)
+        prefix_layout.addItem(QSpacerItem(50, 0, QSizePolicy.Minimum, QSizePolicy.Minimum))
+
+        self.main_layout.addWidget(file_group)
+        self.main_layout.addWidget(self.cmdtree)
+        self.main_layout.addLayout(prefix_layout)
 
     def fill_tree(self):
         i = 0
@@ -208,10 +234,25 @@ class CustomCmd(QWidget):
         self.mapper.mapped[int].connect(self.btn_press)
 
         self.cmdtree.setColumnWidth(0, 200)
-        self.cmdtree.setColumnWidth(1, 150)
+        self.cmdtree.setColumnWidth(1, 200)
 
     def btn_press(self, num):
         self.signal.emit(signal_type('btn_pressed', num))
+
+    def open_file_dialog(self):
+        dir_ = QFileDialog.getOpenFileName(None, 'Open File', '', 'CMD file (*.txt, *.json)')
+        if dir_[0] != '':
+            self.file_path_lable.setText('Path: ' + dir_[0])
+        print(dir_)
+
+    def prefix_check_clicked(self):
+        if self.prefix_check.isChecked():
+            self.prefix_check.setText("On")
+            self.prefix_value.setEnabled(True)
+        else:
+            self.prefix_check.setText('Off')
+            self.prefix_value.setEnabled(False)
+
 
 
 class MainWindow(QMainWindow):
@@ -226,6 +267,7 @@ class MainWindow(QMainWindow):
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.cmd.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
         self.urp.sp_band.valueChanged.connect(self.set_band)
+
 
     def set_band(self):
         band = self.urp.sp_band.value()
@@ -242,7 +284,6 @@ class MainWindow(QMainWindow):
         self.sp = SP()
         self.setCentralWidget(self.sp)
 
-
     def create_cmd_docker(self):
         self.cmd = CustomCmd()
         self.doker_cmd = QDockWidget('Comand', self)
@@ -256,14 +297,20 @@ class MainWindow(QMainWindow):
             print(self.cmd.cmdtree.currentIndex().row())
 
     def cmd_signal_handling(self, signal):
-        print(self.cmd.model.item(signal.value, 0).text())
+        #print(self.cmd.model.item(signal.value, 0).text())
         item = self.cmd.model.item(signal.value, 0)
         if item.hasChildren():
+            command = []
             for i in range(item.rowCount()):
                 child_item = item.child(i, 1)
                 index_ = self.cmd.model.indexFromItem(child_item)
                 widget_ = self.cmd.cmdtree.indexWidget(index_)
-                print(widget_.currentText(), widget_.currentData())
+                command.append(widget_.currentData())
+                #print(widget_.currentText(), widget_.currentData())
+            if self.cmd.prefix_check.isChecked():
+                command.insert(0, self.cmd.prefix_value.value())
+            command = bytes(command)
+            print(command)
 
 
 if __name__ == '__main__':
