@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QComboBox, QLabel, QTextEdit, QDockWidget,
                              QListWidget, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget, QPushButton,
                              QSpinBox, QCheckBox, QSlider, QGroupBox, QSpacerItem, QSizePolicy, QMenu, QLCDNumber,
-                             QTreeWidget, QTreeWidgetItem, QTreeView, QFileDialog)
+                             QTreeWidget, QTreeWidgetItem, QTreeView, QFileDialog, QStyleOptionDockWidget)
 from PyQt5.QtCore import Qt, pyqtSignal, QSignalMapper
 import time
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
@@ -11,6 +11,7 @@ from PyQt5.QtGui import QPalette, QIcon, QColor
 
 import SerialPortDriver
 from collections import namedtuple
+import json
 
 signal_type = namedtuple('Signal', ['name', 'value'])
 
@@ -43,45 +44,73 @@ class SP(QWidget):
         self.set_vertical_layout()
 
     def __create_widgets(self):
-        self.l_PortName = QLabel("Port")
+        self.l_PortName = QLabel("Name")
         self.cb_PortName = QComboBox()
-        for i in self.sp.get_available_ports():
-            self.cb_PortName.addItem(i)
+        self.cb_PortName.setFixedSize(80, 22)
+        self.update_port_name_event()
+
+        self.update_port_name_btn = QPushButton()
+        self.update_port_name_btn.setIcon(QIcon('icons\\refresh.png'))
+        self.update_port_name_btn.setFixedSize(22, 22)
 
         self.l_BaudRate = QLabel('Baudrate')
         self.cb_BaudRate = QComboBox()
+        self.cb_BaudRate.setFixedSize(80, 22)
         self.cb_BaudRate.addItem('115200', 115200)
+        self.cb_BaudRate.addItem('57600', 57600)
+        self.cb_BaudRate.addItem('38400', 38400)
+        self.cb_BaudRate.addItem('19200', 19200)
         self.cb_BaudRate.addItem('9600', 9600)
         self.cb_BaudRate.addItem('4800', 4800)
+        self.cb_BaudRate.addItem('2400', 2400)
+        self.cb_BaudRate.addItem('1200', 1200)
 
         self.pb_connect = QPushButton("Open")
+        self.pb_connect.setFixedSize(80, 30)
         # индикатор подключения
         self.pb_con_state = QPushButton()
-        self.pb_con_state.setIcon(QIcon('refresh.png'))
-        self.pb_con_state.setFixedSize(20, 20)
+        self.pb_con_state.setFixedSize(22, 22)
         # история отправленных  и принятых команд команд
         self.te_log = QTextEdit()
+        self.te_log.setReadOnly(True)
+        # кнопка очистки лога
+        self.clear_btn = QPushButton('Clear')
 
     def __create_events(self):
         self.pb_connect.clicked.connect(self.connection_event)
+        self.clear_btn.clicked.connect(lambda: self.te_log.clear())
+        self.update_port_name_btn.clicked.connect(self.update_port_name_event)
 
     def set_vertical_layout(self):
         self.sp_layout = QVBoxLayout()
         self.setLayout(self.sp_layout)
+
         layout1 = QHBoxLayout()
         layout2 = QHBoxLayout()
         layout3 = QHBoxLayout()
+
         layout1.addWidget(self.l_PortName)
+        layout1.addWidget(self.update_port_name_btn)
         layout1.addWidget(self.cb_PortName)
+
         layout2.addWidget(self.l_BaudRate)
         layout2.addWidget(self.cb_BaudRate)
+
+        layout3.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
         layout3.addWidget(self.pb_con_state)
         layout3.addWidget(self.pb_connect)
-        self.sp_layout.addLayout(layout1)
-        self.sp_layout.addLayout(layout2)
-        self.sp_layout.addLayout(layout3)
+
+        sp_group = QGroupBox('Serial Port')
+        group_layout = QVBoxLayout()
+        sp_group.setLayout(group_layout)
+        self.sp_layout.addWidget(sp_group)
+        group_layout.addLayout(layout1)
+        group_layout.addLayout(layout2)
+        group_layout.addLayout(layout3)
+
         self.sp_layout.addWidget(QLabel("History"))
         self.sp_layout.addWidget(self.te_log)
+        self.sp_layout.addWidget(self.clear_btn)
 
     def set_horizontal_layout(self):
         self.sp_layout = QHBoxLayout()
@@ -114,6 +143,11 @@ class SP(QWidget):
                 self.pb_connect.setText('Open')
                 self.log_info(f'Serial port {portName} opening failed!', 'red')
 
+    def update_port_name_event(self):
+        self.cb_PortName.clear()
+        for i in self.sp.get_available_ports():
+            self.cb_PortName.addItem(i)
+
     def log_info(self, text, color):
         self.te_log.setTextColor(QColor(color))
         self.te_log.append(text)
@@ -126,10 +160,13 @@ class SP(QWidget):
         self.te_log.append('')
 
     def write_read(self, tx_data: bytes, rx_data_len):
-        if self.sp.write(tx_data):
+        if self.sp.is_open():
+            self.sp.write(tx_data)
             rx_data = self.sp.read(rx_data_len)
             self.log_cmd(tx_data, rx_data)
             return rx_data
+        else:
+            self.log_info('Serial port is not open!', 'red')
 
 
 class UrpControl(QWidget):
@@ -157,7 +194,7 @@ class CustomCmd(QWidget):
     def __init__(self):
         super().__init__()
         self.__create_widgets()
-        self.fill_tree()
+        self.setMinimumWidth(550)
 
     def __create_widgets(self):
         self.main_layout = QVBoxLayout()
@@ -165,11 +202,10 @@ class CustomCmd(QWidget):
 
         self.cmdtree = QTreeView()
         self.model = QStandardItemModel()
-        self.model.setHorizontalHeaderLabels(['Names', 'Value', 'Send buttons'])
         self.cmdtree.setModel(self.model)
         self.mapper = QSignalMapper()
 
-        file_group = QGroupBox('File: ')
+        file_group = QGroupBox('Command file')
         self.file_path_lable = QLabel('Path: ')
         self.file_dialog_btn = QPushButton('Open')
         self.file_dialog_btn.setFixedSize(80, 40)
@@ -179,7 +215,7 @@ class CustomCmd(QWidget):
         file_layout.addWidget(self.file_dialog_btn)
         file_group.setLayout(file_layout)
 
-        prefix_group = QGroupBox('Command prefix')
+        prefix_group = QGroupBox('Prefix')
         self.prefix_check = QCheckBox('Off')
         self.prefix_check.clicked.connect(self.prefix_check_clicked)
         self.prefix_value = QSpinBox()
@@ -188,16 +224,16 @@ class CustomCmd(QWidget):
         prefix_layout.addWidget(self.prefix_check)
         prefix_layout.addWidget(self.prefix_value)
         prefix_group.setLayout(prefix_layout)
-        prefix_layout.addWidget(prefix_group)
         prefix_layout.addItem(QSpacerItem(50, 0, QSizePolicy.Minimum, QSizePolicy.Minimum))
 
         self.main_layout.addWidget(file_group)
         self.main_layout.addWidget(self.cmdtree)
-        self.main_layout.addLayout(prefix_layout)
+        self.main_layout.addWidget(prefix_group)
 
-    def fill_tree(self):
+    def fill_tree(self, commands):
+        self.model.clear()
         i = 0
-        for cmd_name, cmd in comands.items():
+        for cmd_name, cmd in commands.items():
 
             cmd_name_item = QStandardItem(cmd_name)
             space = QStandardItem()
@@ -232,17 +268,45 @@ class CustomCmd(QWidget):
                     self.cmdtree.setIndexWidget(cb_index, combo)
 
         self.mapper.mapped[int].connect(self.btn_press)
-
+        self.model.setHorizontalHeaderLabels(['Names', 'Values', 'Send buttons'])
         self.cmdtree.setColumnWidth(0, 200)
         self.cmdtree.setColumnWidth(1, 200)
 
-    def btn_press(self, num):
-        self.signal.emit(signal_type('btn_pressed', num))
+    def int_to_bytes(self, number: int):
+        """
+        Перевод целых чисел в набор байт для случаев, когда число больше 255 (больше uint_8)
+        :param number: int
+        :return: bytes
+        """
+        return number.to_bytes(length=(8 + (number + (number < 0)).bit_length()) // 8,
+                               byteorder='little',
+                               signed=False)
+
+    def btn_press(self, row_num):
+        item = self.model.item(row_num, 0)
+        if item.hasChildren():
+            command = []
+            for i in range(item.rowCount()):
+                child_item = item.child(i, 1)
+                index_ = self.model.indexFromItem(child_item)
+                widget_ = self.cmdtree.indexWidget(index_)
+                command.append(widget_.currentData())
+                #print(widget_.currentText(), widget_.currentData())
+            if self.prefix_check.isChecked():
+                command.insert(0, self.prefix_value.value())
+            bytes_command = b''
+            for _ in command:
+                bytes_command += self.int_to_bytes(_)
+            self.signal.emit(signal_type('send_cmd', bytes_command))
 
     def open_file_dialog(self):
         dir_ = QFileDialog.getOpenFileName(None, 'Open File', '', 'CMD file (*.txt, *.json)')
         if dir_[0] != '':
-            self.file_path_lable.setText('Path: ' + dir_[0])
+            file_path = dir_[0]
+            self.file_path_lable.setText('Path: ' + file_path)
+            with open(file_path) as f:
+                data = json.load(f)
+            self.fill_tree(data)
         print(dir_)
 
     def prefix_check_clicked(self):
@@ -252,7 +316,6 @@ class CustomCmd(QWidget):
         else:
             self.prefix_check.setText('Off')
             self.prefix_value.setEnabled(False)
-
 
 
 class MainWindow(QMainWindow):
@@ -267,7 +330,6 @@ class MainWindow(QMainWindow):
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.cmd.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
         self.urp.sp_band.valueChanged.connect(self.set_band)
-
 
     def set_band(self):
         band = self.urp.sp_band.value()
@@ -297,20 +359,8 @@ class MainWindow(QMainWindow):
             print(self.cmd.cmdtree.currentIndex().row())
 
     def cmd_signal_handling(self, signal):
-        #print(self.cmd.model.item(signal.value, 0).text())
-        item = self.cmd.model.item(signal.value, 0)
-        if item.hasChildren():
-            command = []
-            for i in range(item.rowCount()):
-                child_item = item.child(i, 1)
-                index_ = self.cmd.model.indexFromItem(child_item)
-                widget_ = self.cmd.cmdtree.indexWidget(index_)
-                command.append(widget_.currentData())
-                #print(widget_.currentText(), widget_.currentData())
-            if self.cmd.prefix_check.isChecked():
-                command.insert(0, self.cmd.prefix_value.value())
-            command = bytes(command)
-            print(command)
+        if signal.name == 'send_cmd':
+            self.sp.write_read(signal.value, len(signal.value))
 
 
 if __name__ == '__main__':

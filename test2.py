@@ -1,7 +1,7 @@
 import json
 
 
-dict = comands =\
+comands =\
     {
         'Channel 1 power':
             {
@@ -18,4 +18,4 @@ dict = comands =\
     }
 
 with open('data.json', 'w') as fp:
-    json.dump(dict, fp, sort_keys=True, indent=4)
+    json.dump(comands, fp, sort_keys=True, indent=4)
