@@ -262,14 +262,18 @@ class CustomCmd(QWidget):
 
             for bit_name, bit_value in cmd.items():
                 byte_name_item = QStandardItem(bit_name)
+                byte_value_item = QStandardItem()
+                cmd_name_item.appendRow([byte_name_item, byte_value_item])
+                cb_index = self.model.indexFromItem(byte_value_item)
                 if type(bit_value) == dict:
-                    byte_value_item = QStandardItem()
-                    cmd_name_item.appendRow([byte_name_item, byte_value_item])
                     combo = QComboBox()
                     for text_, data_ in bit_value.items():
                         combo.addItem(text_, data_)
-                    cb_index = self.model.indexFromItem(byte_value_item)
                     self.cmdtree.setIndexWidget(cb_index, combo)
+                elif type(bit_value) == int:
+                    spin = QSpinBox()
+                    spin.setValue(bit_value)
+                    self.cmdtree.setIndexWidget(cb_index, spin)
 
         self.mapper.mapped[int].connect(self.btn_press)
         self.model.setHorizontalHeaderLabels(['Names', 'Values', 'Send buttons'])
@@ -282,10 +286,13 @@ class CustomCmd(QWidget):
             command = []
             for i in range(item.rowCount()):
                 child_item = item.child(i, 1)
+                #print(item.child(i, 0).text())
                 index_ = self.model.indexFromItem(child_item)
                 widget_ = self.cmdtree.indexWidget(index_)
-                command.append(widget_.currentData())
-                #print(widget_.currentText(), widget_.currentData())
+                if type(widget_) == QComboBox:
+                    command.append(widget_.currentData())
+                elif type(widget_) == QSpinBox:
+                    command.append(widget_.value())
             if self.prefix_check.isChecked():
                 command.insert(0, self.prefix_value.value())
             bytes_command = b''
