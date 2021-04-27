@@ -15,21 +15,23 @@ import json
 
 signal_type = namedtuple('Signal', ['name', 'value'])
 
-comands =\
-    {
-        'Channel 1 power':
-            {
-                'Comand num': {'5': 5},
-                'Power': {'Off': 0, 'On': 1},
-            },
 
-        'Set filter':
-            {
-                'Comand num': {'4': 4},
-                'Low': {'BF1 30-90MHz': 0x01, 'BF2 90-120MHz': 0x02, 'BF3 120-210MHz': 0x03},
-                'Hight': {'BF1 30-90MHz': 0x01, 'BF2 90-120MHz': 0x02, 'BF3 120-210MHz': 0x03},
-            }
-    }
+def int_to_bytes(number: int):
+    """
+    Перевод целых чисел в набор байт для случаев, когда число больше 255 (больше uint_8)
+    :param number: int
+    :return: bytes
+    """
+    return number.to_bytes(length=(8 + (number + (number < 0)).bit_length()) // 8,
+                           byteorder='little',
+                           signed=False)
+
+
+def bytes_to_hex_string(data: bytes):
+    res = ''
+    for i, j in zip(data.hex()[::2], data.hex()[1::2]):
+        res += i + j + ' '
+    return res
 
 
 class SP(QWidget):
@@ -155,8 +157,10 @@ class SP(QWidget):
 
     def log_cmd(self, tx, rx):
         self.te_log.setTextColor(QColor('blue'))
-        self.te_log.append(f'TX--> {tx}')
-        self.te_log.append(f'RX--> {rx}')
+        tx_str = bytes_to_hex_string(tx)
+        rx_str = bytes_to_hex_string(rx)
+        self.te_log.append(f'TX--> hex: {tx_str}')
+        self.te_log.append(f'RX--> hex: {rx_str}')
         self.te_log.append('')
 
     def write_read(self, tx_data: bytes, rx_data_len):
@@ -272,16 +276,6 @@ class CustomCmd(QWidget):
         self.cmdtree.setColumnWidth(0, 200)
         self.cmdtree.setColumnWidth(1, 200)
 
-    def int_to_bytes(self, number: int):
-        """
-        Перевод целых чисел в набор байт для случаев, когда число больше 255 (больше uint_8)
-        :param number: int
-        :return: bytes
-        """
-        return number.to_bytes(length=(8 + (number + (number < 0)).bit_length()) // 8,
-                               byteorder='little',
-                               signed=False)
-
     def btn_press(self, row_num):
         item = self.model.item(row_num, 0)
         if item.hasChildren():
@@ -296,7 +290,7 @@ class CustomCmd(QWidget):
                 command.insert(0, self.prefix_value.value())
             bytes_command = b''
             for _ in command:
-                bytes_command += self.int_to_bytes(_)
+                bytes_command += int_to_bytes(_)
             self.signal.emit(signal_type('send_cmd', bytes_command))
 
     def open_file_dialog(self):

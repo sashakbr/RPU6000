@@ -1,7 +1,8 @@
 import json
+import Preselector_commands
 
 
-comands =\
+commands =\
     {
         'Channel 1 power':
             {
@@ -18,4 +19,4 @@ comands =\
     }
 
 with open('data.json', 'w') as fp:
-    json.dump(comands, fp, sort_keys=True, indent=4)
+    json.dump(Preselector_commands.commands, fp, sort_keys=False, indent=4)
