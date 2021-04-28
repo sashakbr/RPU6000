@@ -16,13 +16,13 @@ import json
 signal_type = namedtuple('Signal', ['name', 'value'])
 
 
-def int_to_bytes(number: int):
+def uint_to_bytes(number: int):
     """
     Перевод целых чисел в набор байт для случаев, когда число больше 255 (больше uint_8)
     :param number: int
     :return: bytes
     """
-    return number.to_bytes(length=(8 + (number + (number < 0)).bit_length()) // 8,
+    return number.to_bytes(length=(7 + (number + (number == 0)).bit_length()) // 8,
                            byteorder='little',
                            signed=False)
 
@@ -260,20 +260,32 @@ class CustomCmd(QWidget):
             btn_index = self.model.indexFromItem(send_btn_item)
             self.cmdtree.setIndexWidget(btn_index, btn_send)
 
-            for bit_name, bit_value in cmd.items():
-                byte_name_item = QStandardItem(bit_name)
+            for byte_name, byte_description in cmd.items():
+                byte_name_item = QStandardItem(byte_name)
                 byte_value_item = QStandardItem()
                 cmd_name_item.appendRow([byte_name_item, byte_value_item])
                 cb_index = self.model.indexFromItem(byte_value_item)
-                if type(bit_value) == dict:
-                    combo = QComboBox()
-                    for text_, data_ in bit_value.items():
-                        combo.addItem(text_, data_)
-                    self.cmdtree.setIndexWidget(cb_index, combo)
-                elif type(bit_value) == int:
-                    spin = QSpinBox()
-                    spin.setValue(bit_value)
-                    self.cmdtree.setIndexWidget(cb_index, spin)
+                if type(byte_description) == dict:
+                    if byte_description['type'] == 'num':
+                        spin = QSpinBox()
+                        spin.setMinimum(byte_description['min'])
+                        spin.setMaximum(byte_description['max'])
+                        spin.setSingleStep(byte_description['step'])
+                        spin.setValue(byte_description['def_value'])
+                        self.cmdtree.setIndexWidget(cb_index, spin)
+                    elif byte_description['type'] == 'enum':
+                        combo = QComboBox()
+                        for text_, data_ in byte_description['values'].items():
+                            combo.addItem(text_, data_)
+                        self.cmdtree.setIndexWidget(cb_index, combo)
+                    elif byte_description['type'] == 'const_num':
+                        spin = QSpinBox()
+                        spin.setMaximum(0xFF)
+                        spin.setValue(byte_description['def_value'])
+                        spin.setReadOnly(True)
+                        spin.setDisplayIntegerBase(16)
+                        spin.setPrefix('0x ')
+                        self.cmdtree.setIndexWidget(cb_index, spin)
 
         self.mapper.mapped[int].connect(self.btn_press)
         self.model.setHorizontalHeaderLabels(['Names', 'Values', 'Send buttons'])
@@ -297,7 +309,7 @@ class CustomCmd(QWidget):
                 command.insert(0, self.prefix_value.value())
             bytes_command = b''
             for _ in command:
-                bytes_command += int_to_bytes(_)
+                bytes_command += uint_to_bytes(_)
             self.signal.emit(signal_type('send_cmd', bytes_command))
 
     def open_file_dialog(self):
