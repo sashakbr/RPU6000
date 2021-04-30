@@ -10,167 +10,8 @@ from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtGui import QPalette, QIcon, QColor
 
 import SerialPortDriver
-from collections import namedtuple
+from service import *
 import json
-
-signal_type = namedtuple('Signal', ['name', 'value'])
-
-
-def uint_to_bytes(number: int):
-    """
-    Перевод целых чисел в набор байт для случаев, когда число больше 255 (больше uint_8)
-    :param number: int
-    :return: bytes
-    """
-    return number.to_bytes(length=(7 + (number + (number == 0)).bit_length()) // 8,
-                           byteorder='little',
-                           signed=False)
-
-
-def bytes_to_hex_string(data: bytes):
-    res = ''
-    for i, j in zip(data.hex()[::2], data.hex()[1::2]):
-        res += i + j + ' '
-    return res
-
-
-class SP(QWidget):
-    signal = pyqtSignal(signal_type)
-
-    def __init__(self):
-        super().__init__()
-        self.sp = SerialPortDriver.SP()
-        self.setFixedWidth(250)
-        self.__create_widgets()
-        self.__create_events()
-        self.set_vertical_layout()
-
-    def __create_widgets(self):
-        self.l_PortName = QLabel("Name")
-        self.cb_PortName = QComboBox()
-        self.cb_PortName.setFixedSize(80, 22)
-        self.update_port_name_event()
-
-        self.update_port_name_btn = QPushButton()
-        self.update_port_name_btn.setIcon(QIcon('icons\\refresh.png'))
-        self.update_port_name_btn.setFixedSize(22, 22)
-
-        self.l_BaudRate = QLabel('Baudrate')
-        self.cb_BaudRate = QComboBox()
-        self.cb_BaudRate.setFixedSize(80, 22)
-        self.cb_BaudRate.addItem('115200', 115200)
-        self.cb_BaudRate.addItem('57600', 57600)
-        self.cb_BaudRate.addItem('38400', 38400)
-        self.cb_BaudRate.addItem('19200', 19200)
-        self.cb_BaudRate.addItem('9600', 9600)
-        self.cb_BaudRate.addItem('4800', 4800)
-        self.cb_BaudRate.addItem('2400', 2400)
-        self.cb_BaudRate.addItem('1200', 1200)
-
-        self.pb_connect = QPushButton("Open")
-        self.pb_connect.setFixedSize(80, 30)
-        # индикатор подключения
-        self.pb_con_state = QPushButton()
-        self.pb_con_state.setFixedSize(22, 22)
-        # история отправленных  и принятых команд команд
-        self.te_log = QTextEdit()
-        self.te_log.setReadOnly(True)
-        # кнопка очистки лога
-        self.clear_btn = QPushButton('Clear')
-
-    def __create_events(self):
-        self.pb_connect.clicked.connect(self.connection_event)
-        self.clear_btn.clicked.connect(lambda: self.te_log.clear())
-        self.update_port_name_btn.clicked.connect(self.update_port_name_event)
-
-    def set_vertical_layout(self):
-        self.sp_layout = QVBoxLayout()
-        self.setLayout(self.sp_layout)
-
-        layout1 = QHBoxLayout()
-        layout2 = QHBoxLayout()
-        layout3 = QHBoxLayout()
-
-        layout1.addWidget(self.l_PortName)
-        layout1.addWidget(self.update_port_name_btn)
-        layout1.addWidget(self.cb_PortName)
-
-        layout2.addWidget(self.l_BaudRate)
-        layout2.addWidget(self.cb_BaudRate)
-
-        layout3.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
-        layout3.addWidget(self.pb_con_state)
-        layout3.addWidget(self.pb_connect)
-
-        sp_group = QGroupBox('Serial Port')
-        group_layout = QVBoxLayout()
-        sp_group.setLayout(group_layout)
-        self.sp_layout.addWidget(sp_group)
-        group_layout.addLayout(layout1)
-        group_layout.addLayout(layout2)
-        group_layout.addLayout(layout3)
-
-        self.sp_layout.addWidget(QLabel("History"))
-        self.sp_layout.addWidget(self.te_log)
-        self.sp_layout.addWidget(self.clear_btn)
-
-    def set_horizontal_layout(self):
-        self.sp_layout = QHBoxLayout()
-        self.setLayout(self.sp_layout)
-        self.sp_layout.addWidget(self.pb_con_state)
-        self.sp_layout.addWidget(self.l_PortName)
-        self.sp_layout.addWidget(self.cb_PortName)
-        self.sp_layout.addWidget(self.l_BaudRate)
-        self.sp_layout.addWidget(self.cb_BaudRate)
-        self.sp_layout.addWidget(self.pb_connect)
-
-    def connection_event(self):
-        portName = self.cb_PortName.currentText()
-        if self.sp.is_open():
-            self.sp.close_port()
-            self.signal.emit(signal_type('sp state', 'closed'))
-            self.pb_con_state.setStyleSheet("background-color: grey")
-            self.pb_connect.setText('Open')
-            self.log_info(f'Serial port {portName} is close!', 'orange')
-        else:
-            state = self.sp.open_port(portName)
-            if state:
-                self.signal.emit(signal_type('sp state', 'opened'))
-                self.pb_con_state.setStyleSheet("background-color: green")
-                self.pb_connect.setText('Close')
-                self.log_info(f'Serial port {portName} is open!', 'green')
-            else:
-                self.signal.emit(signal_type('sp state', 'opening failed'))
-                self.pb_con_state.setStyleSheet("background-color: grey")
-                self.pb_connect.setText('Open')
-                self.log_info(f'Serial port {portName} opening failed!', 'red')
-
-    def update_port_name_event(self):
-        self.cb_PortName.clear()
-        for i in self.sp.get_available_ports():
-            self.cb_PortName.addItem(i)
-
-    def log_info(self, text, color):
-        self.te_log.setTextColor(QColor(color))
-        self.te_log.append(text)
-        self.te_log.append("")
-
-    def log_cmd(self, tx, rx):
-        self.te_log.setTextColor(QColor('blue'))
-        tx_str = bytes_to_hex_string(tx)
-        rx_str = bytes_to_hex_string(rx)
-        self.te_log.append(f'TX--> hex: {tx_str}')
-        self.te_log.append(f'RX--> hex: {rx_str}')
-        self.te_log.append('')
-
-    def write_read(self, tx_data: bytes, rx_data_len):
-        if self.sp.is_open():
-            self.sp.write(tx_data)
-            rx_data = self.sp.read(rx_data_len)
-            self.log_cmd(tx_data, rx_data)
-            return rx_data
-        else:
-            self.log_info('Serial port is not open!', 'red')
 
 
 class UrpControl(QWidget):
@@ -318,9 +159,20 @@ class CustomCmd(QWidget):
             file_path = dir_[0]
             self.file_path_lable.setText('Path: ' + file_path)
             with open(file_path) as f:
-                data = json.load(f)
-            self.fill_tree(data)
+                self.cmd_data = json.load(f)
+            self.fill_tree(self.cmd_data)
+            self.file_parse()
         print(dir_)
+
+    def file_parse(self):
+        self.perser_dict = {}
+        for cmd_name, cmd_value in self.cmd_data.items():
+            self.perser_dict.update({cmd_value['Command num']['def_value']: cmd_name})
+
+
+
+
+
 
     def prefix_check_clicked(self):
         if self.prefix_check.isChecked():
@@ -356,7 +208,7 @@ class MainWindow(QMainWindow):
         self.view_menu.addAction(self.docker_urp.toggleViewAction())
 
     def create_sp(self):
-        self.sp = SP()
+        self.sp = SerialPortDriver.SP()
         self.setCentralWidget(self.sp)
 
     def create_cmd_docker(self):
@@ -373,7 +225,21 @@ class MainWindow(QMainWindow):
 
     def cmd_signal_handling(self, signal):
         if signal.name == 'send_cmd':
-            self.sp.write_read(signal.value, len(signal.value))
+            read_cmd = self.sp.write_read(signal.value, len(signal.value))
+            if len(read_cmd):
+                key = self.cmd.perser_dict[int(read_cmd[1])]
+                print(key)
+                cmd_bytes_items = self.cmd.cmd_data[key]
+                for name, item_ in cmd_bytes_items.items():
+                    print(name)
+                    if item_['type'] == 'const_num':
+                        print(item_['def_value'])
+                    elif item_['type'] == 'enum':
+                        my_dict = item_['values']
+                        my_dict = {my_dict[k]: k for k in my_dict}
+                        print(my_dict[read_cmd[2]])
+
+
 
 
 if __name__ == '__main__':
