@@ -61,10 +61,12 @@ class CustomCmd(QWidget):
         file_group.setLayout(file_layout)
 
         prefix_group = QGroupBox('Prefix')
-        self.prefix_check = QCheckBox('Off')
+        self.prefix_check = QCheckBox('On')
+        self.prefix_check.setChecked(True)
         self.prefix_check.clicked.connect(self.prefix_check_clicked)
         self.prefix_value = QSpinBox()
-        self.prefix_value.setEnabled(False)
+        self.prefix_value.setEnabled(True)
+        self.prefix_value.setMaximum(255)
         prefix_layout = QHBoxLayout()
         prefix_layout.addWidget(self.prefix_check)
         prefix_layout.addWidget(self.prefix_value)
@@ -105,7 +107,7 @@ class CustomCmd(QWidget):
                 byte_name_item = QStandardItem(byte_name)
                 byte_value_item = QStandardItem()
                 cmd_name_item.appendRow([byte_name_item, byte_value_item])
-                cb_index = self.model.indexFromItem(byte_value_item)
+                byte_widget_index = self.model.indexFromItem(byte_value_item)
                 if type(byte_description) == dict:
                     if byte_description['type'] == 'num':
                         spin = QSpinBox()
@@ -113,20 +115,41 @@ class CustomCmd(QWidget):
                         spin.setMaximum(byte_description['max'])
                         spin.setSingleStep(byte_description['step'])
                         spin.setValue(byte_description['def_value'])
-                        self.cmdtree.setIndexWidget(cb_index, spin)
+                        self.cmdtree.setIndexWidget(byte_widget_index, spin)
                     elif byte_description['type'] == 'enum':
                         combo = QComboBox()
                         for text_, data_ in byte_description['values'].items():
                             combo.addItem(text_, data_)
-                        self.cmdtree.setIndexWidget(cb_index, combo)
+                        self.cmdtree.setIndexWidget(byte_widget_index, combo)
                     elif byte_description['type'] == 'const_num':
                         spin = QSpinBox()
                         spin.setMaximum(0xFF)
                         spin.setValue(byte_description['def_value'])
                         spin.setReadOnly(True)
                         spin.setDisplayIntegerBase(16)
-                        spin.setPrefix('0x ')
-                        self.cmdtree.setIndexWidget(cb_index, spin)
+                        spin.setPrefix('0x')
+                        self.cmdtree.setIndexWidget(byte_widget_index, spin)
+                    elif byte_description['type'] == 'bit_field':
+                        for bit_name, bit_description in byte_description['description'].items():
+                            bit_name_item = QStandardItem(bit_name)
+                            bit_value_item = QStandardItem()
+                            byte_name_item.appendRow([bit_name_item, bit_value_item])
+                            bit_widget_index = self.model.indexFromItem(bit_value_item)
+                            if type(bit_description) == dict:
+                                if bit_description['type'] == 'bit_enum':
+                                    combo = QComboBox()
+                                    combo.start_bit = bit_description['star_bit']
+                                    combo.stop_bit = bit_description['stop_bit']
+                                    for text_, data_ in bit_description['values'].items():
+                                        combo.addItem(text_, data_)
+                                    self.cmdtree.setIndexWidget(bit_widget_index, combo)
+                                elif bit_description['type'] == 'bit_bool':
+                                    check = QCheckBox()
+                                    check.setChecked(bit_description['def_state'])
+                                    check.bit_num = bit_description['bit_num']
+                                    self.cmdtree.setIndexWidget(bit_widget_index, check)
+                                elif bit_description['type'] == 'bit_num':
+                                    pass
 
         self.mapper.mapped[int].connect(self.btn_press)
         self.model.setHorizontalHeaderLabels(['Names', 'Values', 'Send buttons'])
@@ -134,24 +157,39 @@ class CustomCmd(QWidget):
         self.cmdtree.setColumnWidth(1, 200)
 
     def btn_press(self, row_num):
-        item = self.model.item(row_num, 0)
-        if item.hasChildren():
-            command = []
-            for i in range(item.rowCount()):
-                child_item = item.child(i, 1)
-                #print(item.child(i, 0).text())
-                index_ = self.model.indexFromItem(child_item)
-                widget_ = self.cmdtree.indexWidget(index_)
-                if type(widget_) == QComboBox:
-                    command.append(widget_.currentData())
-                elif type(widget_) == QSpinBox:
-                    command.append(widget_.value())
-            if self.prefix_check.isChecked():
-                command.insert(0, self.prefix_value.value())
-            bytes_command = b''
-            for _ in command:
-                bytes_command += uint_to_bytes(_)
-            self.signal.emit(signal_type('send_cmd', bytes_command))
+        command_item = self.model.item(row_num, 0)
+        command = b''
+        if self.prefix_check.isChecked():
+            command += self.prefix_value.value().to_bytes(1, 'little', signed=False)
+        if command_item.hasChildren():
+            for i in range(command_item.rowCount()):
+                byte_name_item = command_item.child(i, 0)
+                byte_widget_item = command_item.child(i, 1)
+                if not byte_name_item.hasChildren():
+                    index_ = self.model.indexFromItem(byte_widget_item)
+                    widget_ = self.cmdtree.indexWidget(index_)
+                    if type(widget_) == QComboBox:
+                        command += widget_.currentData().to_bytes(1, 'little', signed=False)
+                    elif type(widget_) == QSpinBox:
+                        if widget_.maximum() > 0xFF:
+                            command += widget_.value().to_bytes(2, 'little', signed=False)
+                        else:
+                            command += widget_.value().to_bytes(1, 'little', signed=False)
+                    else:
+                        pass
+                else:
+                    byte_ = 0
+                    for j in range(byte_name_item.rowCount()):
+                        bit_widget_item = byte_name_item.child(j, 1)
+                        index_ = self.model.indexFromItem(bit_widget_item)
+                        widget_ = self.cmdtree.indexWidget(index_)
+                        if type(widget_) == QComboBox:
+                            byte_ += widget_.currentData() << widget_.start_bit
+                        elif type(widget_) == QCheckBox:
+                            byte_ = bit_change(byte_, widget_.bit_num, widget_.isChecked())
+                    command += byte_.to_bytes(1, 'little', signed=False)
+
+        self.signal.emit(signal_type('send_cmd', command))
 
     def open_file_dialog(self):
         dir_ = QFileDialog.getOpenFileName(None, 'Open File', '', 'CMD file (*.txt, *.json)')
@@ -161,18 +199,7 @@ class CustomCmd(QWidget):
             with open(file_path) as f:
                 self.cmd_data = json.load(f)
             self.fill_tree(self.cmd_data)
-            self.file_parse()
         print(dir_)
-
-    def file_parse(self):
-        self.perser_dict = {}
-        for cmd_name, cmd_value in self.cmd_data.items():
-            self.perser_dict.update({cmd_value['Command num']['def_value']: cmd_name})
-
-
-
-
-
 
     def prefix_check_clicked(self):
         if self.prefix_check.isChecked():
@@ -190,11 +217,11 @@ class MainWindow(QMainWindow):
         self.resize(800, 600)
         self.view_menu = self.menuBar().addMenu("&View")
         self.create_sp()
-        self.create_urp_docker()
+        #self.create_urp_docker()
         self.create_cmd_docker()
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.cmd.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
-        self.urp.sp_band.valueChanged.connect(self.set_band)
+        #self.urp.sp_band.valueChanged.connect(self.set_band)
 
     def set_band(self):
         band = self.urp.sp_band.value()
@@ -226,20 +253,8 @@ class MainWindow(QMainWindow):
     def cmd_signal_handling(self, signal):
         if signal.name == 'send_cmd':
             read_cmd = self.sp.write_read(signal.value, len(signal.value))
-            if len(read_cmd):
-                key = self.cmd.perser_dict[int(read_cmd[1])]
-                print(key)
-                cmd_bytes_items = self.cmd.cmd_data[key]
-                for name, item_ in cmd_bytes_items.items():
-                    print(name)
-                    if item_['type'] == 'const_num':
-                        print(item_['def_value'])
-                    elif item_['type'] == 'enum':
-                        my_dict = item_['values']
-                        my_dict = {my_dict[k]: k for k in my_dict}
-                        print(my_dict[read_cmd[2]])
-
-
+            pref = self.cmd.prefix_check.isChecked()
+            self.sp.log_info(cmd_parser(signal.value, self.cmd.cmd_data, is_prefix_on=pref), 'black')
 
 
 if __name__ == '__main__':

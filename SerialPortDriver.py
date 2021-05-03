@@ -30,7 +30,7 @@ class SP(QWidget):
         self.__set_events()
 
     def __create_widgets(self):
-        self.setFixedWidth(250)
+        self.setFixedWidth(270)
         self.l_PortName = QLabel("Name")
         self.cb_PortName = QComboBox()
         self.cb_PortName.setFixedSize(80, 22)
