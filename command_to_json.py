@@ -40,12 +40,25 @@ commands = \
             'Command num':
                 {
                     'type': 'const_num',
-                    'def_value': 0x0E,
+                    'def_value': 0x0F,
                 },
             'Power':
                 {
                     'type': 'enum',
                     'values': {'Turn off both channels': 0, 'Turn on 1': 1, 'Turn on 2': 2, 'Turn on both channels': 3}
+                },
+            'Check_box':
+                {
+                    'type': 'bool',
+                    'def_state': True,
+                },
+            'Freq':
+                {
+                    'type': 'num',
+                    'def_value': 100,
+                    'min': 30,
+                    'max': 6000,
+                    'step': 10,
                 },
             'state':
                 {
@@ -61,8 +74,8 @@ commands = \
                             'just enum':
                                 {
                                     'type': 'bit_enum',
-                                    'star_bit': 4,
-                                    'stop_bit': 6,
+                                    'start_bit': 4,
+                                    'quantity_bit': 3,
                                     'values': {'Turn off both channels': 0, 'Turn on 1': 1}
                                 },
 

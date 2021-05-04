@@ -116,11 +116,13 @@ class CustomCmd(QWidget):
                         spin.setSingleStep(byte_description['step'])
                         spin.setValue(byte_description['def_value'])
                         self.cmdtree.setIndexWidget(byte_widget_index, spin)
+
                     elif byte_description['type'] == 'enum':
                         combo = QComboBox()
                         for text_, data_ in byte_description['values'].items():
                             combo.addItem(text_, data_)
                         self.cmdtree.setIndexWidget(byte_widget_index, combo)
+
                     elif byte_description['type'] == 'const_num':
                         spin = QSpinBox()
                         spin.setMaximum(0xFF)
@@ -129,6 +131,12 @@ class CustomCmd(QWidget):
                         spin.setDisplayIntegerBase(16)
                         spin.setPrefix('0x')
                         self.cmdtree.setIndexWidget(byte_widget_index, spin)
+
+                    elif byte_description['type'] == 'bool':
+                        check = QCheckBox()
+                        check.setChecked(byte_description['def_state'])
+                        self.cmdtree.setIndexWidget(byte_widget_index, check)
+
                     elif byte_description['type'] == 'bit_field':
                         for bit_name, bit_description in byte_description['description'].items():
                             bit_name_item = QStandardItem(bit_name)
@@ -138,16 +146,18 @@ class CustomCmd(QWidget):
                             if type(bit_description) == dict:
                                 if bit_description['type'] == 'bit_enum':
                                     combo = QComboBox()
-                                    combo.start_bit = bit_description['star_bit']
-                                    combo.stop_bit = bit_description['stop_bit']
+                                    combo.start_bit = bit_description['start_bit']
+                                    combo.quantity_bit = bit_description['quantity_bit']
                                     for text_, data_ in bit_description['values'].items():
                                         combo.addItem(text_, data_)
                                     self.cmdtree.setIndexWidget(bit_widget_index, combo)
+
                                 elif bit_description['type'] == 'bit_bool':
                                     check = QCheckBox()
                                     check.setChecked(bit_description['def_state'])
                                     check.bit_num = bit_description['bit_num']
                                     self.cmdtree.setIndexWidget(bit_widget_index, check)
+
                                 elif bit_description['type'] == 'bit_num':
                                     pass
 
@@ -175,6 +185,8 @@ class CustomCmd(QWidget):
                             command += widget_.value().to_bytes(2, 'little', signed=False)
                         else:
                             command += widget_.value().to_bytes(1, 'little', signed=False)
+                    elif type(widget_) == QCheckBox:
+                        command += widget_.isChecked().to_bytes(1, 'little', signed=False)
                     else:
                         pass
                 else:
