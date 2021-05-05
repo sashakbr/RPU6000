@@ -12,7 +12,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.resize(800, 600)
+        self.resize(800, 800)
         self.view_menu = self.menuBar().addMenu("&View")
         self.create_sp()
         self.create_cmd_viewer_docker()
@@ -54,4 +54,8 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
+    # msg = QMessageBox()
+    # msg.setIcon(QMessageBox.Warning)
+    # msg.setInformativeText('More information')
+    # msg.show()
     sys.exit(app.exec_())

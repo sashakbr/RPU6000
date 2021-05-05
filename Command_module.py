@@ -1,7 +1,8 @@
 import sys
 from PyQt5.QtWidgets import (QComboBox, QLabel, QTextEdit, QListWidget, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget,
                              QPushButton, QSpinBox, QCheckBox, QSlider, QGroupBox, QSpacerItem, QSizePolicy,
-                             QMenu, QLCDNumber, QTreeWidget, QTreeWidgetItem, QTreeView, QFileDialog)
+                             QMenu, QLCDNumber, QTreeWidget, QTreeWidgetItem, QTreeView, QFileDialog, QStackedWidget,
+                             QListWidgetItem, QMessageBox)
 from PyQt5.QtCore import pyqtSignal, QSignalMapper
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from service import *
@@ -205,10 +206,226 @@ class CmdCreatorWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.__create_widgets()
+        self.create_stack_widgets()
 
     def __create_widgets(self):
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
+
+        add_layout = QHBoxLayout()
+        self.main_layout.addLayout(add_layout)
+        self.te_cmd_name = QTextEdit('Some name')
+        self.te_cmd_name.setMaximumHeight(24)
+        self.sb_cmd_num = QSpinBox()
+        self.sb_cmd_num.setMaximum(0xFF)
+        self.sb_cmd_num.setPrefix('0x')
+        self.sb_cmd_num.setDisplayIntegerBase(16)
+        self.sb_cmd_num.setMaximumHeight(40)
+        self.btn_add_cmd = QPushButton('Add byte')
+        add_layout.addWidget(QLabel('Name: '))
+        add_layout.addWidget(self.te_cmd_name)
+        add_layout.addWidget(QLabel('Number: '))
+        add_layout.addWidget(self.sb_cmd_num)
+        add_layout.addWidget(self.btn_add_cmd)
+
+        self.cmdtree = QTreeView()
+        self.model = QStandardItemModel()
+        self.cmdtree.setModel(self.model)
+        self.main_layout.addWidget(self.cmdtree)
+
+        self.cb_byte_type = QComboBox()
+        self.cb_byte_type.addItem('enum', 0)
+        self.cb_byte_type.addItem('const_num', 1)
+
+        self.btn_add_byte = QPushButton('Add')
+        self.stack = QStackedWidget(self)
+        self.layout_stack = QHBoxLayout()
+        self.main_layout.addLayout(self.layout_stack)
+        layout1 = QVBoxLayout()
+        self.layout_stack.addLayout(layout1)
+        layout1.addWidget(self.cb_byte_type)
+        layout1.addWidget(self.btn_add_byte)
+        self.layout_stack.addWidget(self.stack)
+
+        self.cb_byte_type.currentIndexChanged.connect(lambda: self.stack.setCurrentIndex(self.cb_byte_type.currentIndex()))
+        self.btn_add_byte.clicked.connect(self.add_byte)
+        self.btn_add_cmd.clicked.connect(self.create_cmd)
+
+    def create_cmd(self):
+        self.cmd_name = self.te_cmd_name.toPlainText()
+        self.cmd = {
+                    self.cmd_name:
+                        {
+                            'Command num':
+                                {
+                                    'type': 'const_num',
+                                    'def_value': self.sb_cmd_num.value(),
+                                },
+                        }
+                    }
+        self.fill_tree()
+
+    def add_byte(self):
+        byte_type = self.cb_byte_type.currentText()
+        if byte_type == 'enum':
+            added_byte = self.widget_enum.get_byte_item()
+        elif byte_type == 'num':
+            pass
+        elif byte_type == 'const_num':
+            pass
+        elif byte_type == 'bool':
+            pass
+        elif byte_type == 'bit_field':
+            pass
+
+
+        self.cmd[self.cmd_name].update(added_byte)
+        self.fill_tree()
+
+    def fill_tree(self):
+        self.model.clear()
+        i = 0
+        for cmd_name, cmd in self.cmd.items():
+            print(cmd_name)
+            cmd_name_item = QStandardItem(cmd_name)
+            space = QStandardItem()
+            send_btn_item = QStandardItem()
+            self.model.appendRow([cmd_name_item])
+            i += 1
+            for byte_name, byte_description in cmd.items():
+                byte_name_item = QStandardItem(byte_name)
+                byte_value_item = QStandardItem()
+                cmd_name_item.appendRow([byte_name_item, byte_value_item])
+                byte_widget_index = self.model.indexFromItem(byte_value_item)
+                if type(byte_description) == dict:
+                    if byte_description['type'] == 'num':
+                        spin = QSpinBox()
+                        spin.setMinimum(byte_description['min'])
+                        spin.setMaximum(byte_description['max'])
+                        spin.setSingleStep(byte_description['step'])
+                        spin.setValue(byte_description['def_value'])
+                        self.cmdtree.setIndexWidget(byte_widget_index, spin)
+
+                    elif byte_description['type'] == 'enum':
+                        combo = QComboBox()
+                        for text_, data_ in byte_description['values'].items():
+                            combo.addItem(text_, data_)
+                        self.cmdtree.setIndexWidget(byte_widget_index, combo)
+
+                    elif byte_description['type'] == 'const_num':
+                        spin = QSpinBox()
+                        spin.setMaximum(0xFF)
+                        spin.setValue(byte_description['def_value'])
+                        spin.setReadOnly(True)
+                        spin.setDisplayIntegerBase(16)
+                        spin.setPrefix('0x')
+                        self.cmdtree.setIndexWidget(byte_widget_index, spin)
+
+                    elif byte_description['type'] == 'bool':
+                        check = QCheckBox()
+                        check.setChecked(byte_description['def_state'])
+                        self.cmdtree.setIndexWidget(byte_widget_index, check)
+
+                    elif byte_description['type'] == 'bit_field':
+                        for bit_name, bit_description in byte_description['description'].items():
+                            bit_name_item = QStandardItem(bit_name)
+                            bit_value_item = QStandardItem()
+                            byte_name_item.appendRow([bit_name_item, bit_value_item])
+                            bit_widget_index = self.model.indexFromItem(bit_value_item)
+                            if type(bit_description) == dict:
+                                if bit_description['type'] == 'bit_enum':
+                                    combo = QComboBox()
+                                    combo.start_bit = bit_description['start_bit']
+                                    combo.quantity_bit = bit_description['quantity_bit']
+                                    for text_, data_ in bit_description['values'].items():
+                                        combo.addItem(text_, data_)
+                                    self.cmdtree.setIndexWidget(bit_widget_index, combo)
+
+                                elif bit_description['type'] == 'bit_bool':
+                                    check = QCheckBox()
+                                    check.setChecked(bit_description['def_state'])
+                                    check.bit_num = bit_description['bit_num']
+                                    self.cmdtree.setIndexWidget(bit_widget_index, check)
+
+                                elif bit_description['type'] == 'bit_num':
+                                    pass
+
+        self.model.setHorizontalHeaderLabels(['Names', 'Values'])
+        self.cmdtree.setColumnWidth(0, 200)
+        self.cmdtree.setColumnWidth(1, 200)
+
+    def create_stack_widgets(self):
+        self.widget_enum = WidgetEnum()
+        self.stack.addWidget(self.widget_enum)
+
+
+class WidgetEnum(QWidget):
+    signal = pyqtSignal(signal_type)
+
+    def __init__(self):
+        super().__init__()
+        self.__create_widgets()
+        self.item_add.clicked.connect(self.add_item_to_list)
+        self.items = {}
+
+    def __create_widgets(self):
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
+
+        lable_name = QLabel('Enum byte name:')
+        self.te_name = QTextEdit('Some byte name')
+        self.te_name.setMaximumHeight(24)
+        layout_name = QHBoxLayout()
+        self.main_layout.addLayout(layout_name)
+        layout_name.addWidget(lable_name)
+        layout_name.addWidget(self.te_name)
+
+        group_box = QGroupBox('Values')
+        self.main_layout.addWidget(group_box)
+
+        gb_layout = QVBoxLayout()
+        group_box.setLayout(gb_layout)
+        self.items_list = QListWidget()
+        gb_layout.addWidget(self.items_list)
+        add_layout = QHBoxLayout()
+        gb_layout.addLayout(add_layout)
+        self.item_value = QSpinBox()
+        self.item_value.setMaximum(0xFF)
+        self.item_value.setPrefix('0x')
+        self.item_value.setDisplayIntegerBase(16)
+        self.item_value.setMaximumHeight(40)
+        self.item_name = QTextEdit('Name')
+        self.item_name.setMaximumHeight(24)
+        self.item_add = QPushButton('Add')
+        add_layout.addWidget(QLabel('Value'))
+        add_layout.addWidget(self.item_value)
+        add_layout.addWidget(QLabel('Name'))
+        add_layout.addWidget(self.item_name)
+        add_layout.addWidget(self.item_add)
+
+    def add_item_to_list(self):
+        name = self.item_name.toPlainText()
+        data = self.item_value.value()
+        self.items.update({name: data})
+        self.items_list.clear()
+        for name_, data_ in self.items.items():
+            item = QListWidgetItem(name_)
+            item.setData(3, data_)
+            self.items_list.addItem(item)
+
+    def get_byte_item(self):
+        byte_name = self.te_name.toPlainText()
+        byte_ = {
+            byte_name:
+            {
+                'type': 'enum',
+                'values': self.items
+            }
+        }
+        self.items = {}
+        self.items_list.clear()
+        print(byte_)
+        return byte_
 
 
 def cmd_parser(cmd: bytes, protocol: dict, is_prefix_on: bool):
