@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import (QComboBox, QLabel, QTextEdit, QListWidget, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget,
                              QPushButton, QSpinBox, QCheckBox, QSlider, QGroupBox, QSpacerItem, QSizePolicy,
                              QMenu, QLCDNumber, QTreeWidget, QTreeWidgetItem, QTreeView, QFileDialog, QStackedWidget,
-                             QListWidgetItem, QMessageBox)
+                             QListWidgetItem, QMessageBox, QLayoutItem)
 from PyQt5.QtCore import pyqtSignal, QSignalMapper
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from service import *
@@ -45,9 +45,13 @@ class CmdViewerWidget(QWidget):
         self.prefix_value = QSpinBox()
         self.prefix_value.setEnabled(True)
         self.prefix_value.setMaximum(255)
+        self.prefix_value.setMaximumWidth(80)
         prefix_layout = QHBoxLayout()
         prefix_layout.addWidget(self.prefix_check)
+        prefix_layout.addSpacing(15)
+        prefix_layout.addWidget(QLabel('Prefix num'))
         prefix_layout.addWidget(self.prefix_value)
+        prefix_layout.addStretch(1)
         prefix_group.setLayout(prefix_layout)
         prefix_layout.addItem(QSpacerItem(50, 0, QSizePolicy.Minimum, QSizePolicy.Minimum))
 
@@ -182,14 +186,16 @@ class CmdViewerWidget(QWidget):
         self.signal.emit(signal_type('send_cmd', command))
 
     def open_file_dialog(self):
-        dir_ = QFileDialog.getOpenFileName(None, 'Open File', '', 'CMD file (*.txt, *.json)')
+        dir_ = QFileDialog.getOpenFileName(None, 'Open File', '', 'CMD file (*.json)')
         if dir_[0] != '':
             file_path = dir_[0]
             self.file_path_lable.setText('Path: ' + file_path)
-            with open(file_path) as f:
-                self.cmd_data = json.load(f)
+            self.open_file(file_path)
+
+    def open_file(self, path):
+        with open(path) as f:
+            self.cmd_data = json.load(f)
             self.fill_tree(self.cmd_data)
-        print(dir_)
 
     def prefix_check_clicked(self):
         if self.prefix_check.isChecked():
@@ -221,7 +227,7 @@ class CmdCreatorWidget(QWidget):
         self.sb_cmd_num.setPrefix('0x')
         self.sb_cmd_num.setDisplayIntegerBase(16)
         self.sb_cmd_num.setMaximumHeight(40)
-        self.btn_add_cmd = QPushButton('Add byte')
+        self.btn_add_cmd = QPushButton('Create')
         add_layout.addWidget(QLabel('Name: '))
         add_layout.addWidget(self.te_cmd_name)
         add_layout.addWidget(QLabel('Number: '))
@@ -233,23 +239,39 @@ class CmdCreatorWidget(QWidget):
         self.cmdtree.setModel(self.model)
         self.main_layout.addWidget(self.cmdtree)
 
+        layout1 = QHBoxLayout()
+        self.btn_clear_cmd = QPushButton('Clear')
+        self.btn_save_cmd = QPushButton('Save')
+        layout1.addWidget(self.btn_clear_cmd)
+        layout1.addWidget(self.btn_save_cmd)
+        self.main_layout.addLayout(layout1)
+
         self.cb_byte_type = QComboBox()
         self.cb_byte_type.addItem('enum', 0)
-        self.cb_byte_type.addItem('const_num', 1)
+        self.cb_byte_type.addItem('bool', 1)
+        self.cb_byte_type.addItem('num', 2)
 
-        self.btn_add_byte = QPushButton('Add')
+        self.btn_add_byte = QPushButton('Add \n byte')
         self.stack = QStackedWidget(self)
         self.layout_stack = QHBoxLayout()
         self.main_layout.addLayout(self.layout_stack)
-        layout1 = QVBoxLayout()
-        self.layout_stack.addLayout(layout1)
-        layout1.addWidget(self.cb_byte_type)
-        layout1.addWidget(self.btn_add_byte)
+
+        layout2 = QVBoxLayout()
+        group_byte_type = QGroupBox('Byte type')
+        group_byte_type.setLayout(layout2)
+        self.layout_stack.addWidget(group_byte_type)
+
+        layout2.addWidget(self.cb_byte_type)
+        layout2.addStretch(1)
+        layout2.addWidget(self.btn_add_byte)
         self.layout_stack.addWidget(self.stack)
 
-        self.cb_byte_type.currentIndexChanged.connect(lambda: self.stack.setCurrentIndex(self.cb_byte_type.currentIndex()))
+        self.cb_byte_type.currentIndexChanged.connect(lambda:
+                                                      self.stack.setCurrentIndex(self.cb_byte_type.currentIndex()))
         self.btn_add_byte.clicked.connect(self.add_byte)
         self.btn_add_cmd.clicked.connect(self.create_cmd)
+        self.btn_clear_cmd.clicked.connect(self.remote_cmd)
+        self.btn_save_cmd.clicked.connect(self.save_cmd)
 
     def create_cmd(self):
         self.cmd_name = self.te_cmd_name.toPlainText()
@@ -265,19 +287,34 @@ class CmdCreatorWidget(QWidget):
                     }
         self.fill_tree()
 
+    def remote_cmd(self):
+        self.cmd = {}
+        self.model.clear()
+
+    def save_cmd(self):
+        dir_ = QFileDialog.getOpenFileName(None, 'Open File', '', 'CMD file (*.json)')
+        if dir_[0] != '':
+            file_path = dir_[0]
+            with open(file_path, 'r') as fp:
+                file_data = json.load(fp)
+                file_data.update(self.cmd)
+            with open(file_path, 'w') as fp:
+                json.dump(file_data, fp, sort_keys=False, indent=4)
+                self.signal.emit(signal_type('saved file', file_path))
+
     def add_byte(self):
         byte_type = self.cb_byte_type.currentText()
         if byte_type == 'enum':
             added_byte = self.widget_enum.get_byte_item()
         elif byte_type == 'num':
-            pass
+            added_byte = self.widget_num.get_byte_item()
         elif byte_type == 'const_num':
             pass
         elif byte_type == 'bool':
+            added_byte = self.widget_bool.get_byte_item()
             pass
         elif byte_type == 'bit_field':
             pass
-
 
         self.cmd[self.cmd_name].update(added_byte)
         self.fill_tree()
@@ -286,7 +323,6 @@ class CmdCreatorWidget(QWidget):
         self.model.clear()
         i = 0
         for cmd_name, cmd in self.cmd.items():
-            print(cmd_name)
             cmd_name_item = QStandardItem(cmd_name)
             space = QStandardItem()
             send_btn_item = QStandardItem()
@@ -357,6 +393,10 @@ class CmdCreatorWidget(QWidget):
     def create_stack_widgets(self):
         self.widget_enum = WidgetEnum()
         self.stack.addWidget(self.widget_enum)
+        self.widget_bool = WidgetBool()
+        self.stack.addWidget(self.widget_bool)
+        self.widget_num = WidgetNum()
+        self.stack.addWidget(self.widget_num)
 
 
 class WidgetEnum(QWidget):
@@ -373,7 +413,7 @@ class WidgetEnum(QWidget):
         self.setLayout(self.main_layout)
 
         lable_name = QLabel('Enum byte name:')
-        self.te_name = QTextEdit('Some byte name')
+        self.te_name = QTextEdit('Some enum byte name')
         self.te_name.setMaximumHeight(24)
         layout_name = QHBoxLayout()
         self.main_layout.addLayout(layout_name)
@@ -424,7 +464,151 @@ class WidgetEnum(QWidget):
         }
         self.items = {}
         self.items_list.clear()
-        print(byte_)
+        return byte_
+
+
+class WidgetBool(QWidget):
+    signal = pyqtSignal(signal_type)
+
+    def __init__(self):
+        super().__init__()
+        self.__create_widgets()
+        self.cb_state.clicked.connect(self.changed_state)
+
+    def __create_widgets(self):
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
+
+        lable_name = QLabel('Bool byte name:')
+        self.te_name = QTextEdit('Some bool byte name')
+        self.te_name.setMaximumHeight(24)
+        layout_name = QHBoxLayout()
+        self.main_layout.addLayout(layout_name)
+        layout_name.addWidget(lable_name)
+        layout_name.addWidget(self.te_name)
+
+        lable_cb = QLabel('Default state: ')
+        self.cb_state = QCheckBox('Off')
+        layout_state = QHBoxLayout()
+        self.main_layout.addLayout(layout_state)
+        layout_state.addWidget(lable_cb)
+        layout_state.addWidget(self.cb_state)
+        layout_state.addStretch(1)
+        self.main_layout.addStretch(1)
+
+    def changed_state(self):
+        if self.cb_state.isChecked():
+            self.cb_state.setText('On')
+        else:
+            self.cb_state.setText('Off')
+
+    def get_byte_item(self):
+        byte_name = self.te_name.toPlainText()
+        byte_ = {
+            byte_name:
+                {
+                    'type': 'bool',
+                    'def_state': self.cb_state.isChecked()
+                }
+        }
+        return byte_
+
+
+class WidgetNum(QWidget):
+    signal = pyqtSignal(signal_type)
+
+    def __init__(self):
+        super().__init__()
+        self.__create_widgets()
+        self.sb_step.valueChanged.connect(self.changed_step)
+        self.sb_max.valueChanged.connect(self.changed_max)
+        self.sb_min.valueChanged.connect(self.changed_min)
+        self.sb_def.valueChanged.connect(self.changed_def)
+
+    def __create_widgets(self):
+        self.main_layout = QGridLayout()
+        self.setLayout(self.main_layout)
+
+        lable_name = QLabel('Numeric byte name:')
+        self.te_name = QTextEdit('Some numeric byte name')
+        self.te_name.setMaximumHeight(24)
+
+        lable_sb_def = QLabel('Default value: ')
+        self.sb_def = QSpinBox()
+
+        lable_sb_min = QLabel('Minimum value: ')
+        self.sb_min = QSpinBox()
+        self.sb_min.setMaximum(0xFFFF)
+
+        lable_sb_max = QLabel('Maximum value: ')
+        self.sb_max = QSpinBox()
+        self.sb_max.setMaximum(0xFFFF)
+        self.sb_max.setValue(0xFF)
+
+        lable_sb_step = QLabel('Step value: ')
+        self.sb_step = QSpinBox()
+        self.sb_step.setMinimum(1)
+
+        self.main_layout.addWidget(lable_name, 0, 0)
+        self.main_layout.addWidget(self.te_name, 0, 1)
+        self.main_layout.addWidget(lable_sb_def, 1, 0)
+        self.main_layout.addWidget(self.sb_def, 1, 1)
+        self.main_layout.addWidget(lable_sb_min, 2, 0)
+        self.main_layout.addWidget(self.sb_min, 2, 1)
+        self.main_layout.addWidget(lable_sb_max, 3, 0)
+        self.main_layout.addWidget(self.sb_max, 3, 1)
+        self.main_layout.addWidget(lable_sb_step, 4, 0)
+        self.main_layout.addWidget(self.sb_step, 4, 1)
+
+    def changed_min(self):
+        if self.sb_min.value() > (self.sb_max.value() - self.sb_step.value()):
+            self.sb_max.setValue(self.sb_min.value() + self.sb_step.value())
+
+        if self.sb_def.value() < self.sb_min.value():
+            self.sb_def.setValue(self.sb_min.value())
+        if self.sb_def.value() > self.sb_max.value():
+            self.sb_def.setValue(self.sb_max.value())
+
+    def changed_max(self):
+        if self.sb_max.value() < (self.sb_min.value() + self.sb_step.value()):
+            step = self.sb_max.value() - self.sb_min.value()
+            if step >= 1:
+                self.sb_step.setValue(step)
+            else:
+                self.sb_max.setValue(self.sb_min.value() + self.sb_step.value())
+
+        if self.sb_def.value() < self.sb_min.value():
+            self.sb_def.setValue(self.sb_min.value())
+        if self.sb_def.value() > self.sb_max.value():
+            self.sb_def.setValue(self.sb_max.value())
+
+    def changed_step(self):
+        if self.sb_step.value() > (self.sb_max.value() - self.sb_min.value()):
+            self.sb_max.setValue(self.sb_min.value() + self.sb_step.value())
+
+        if self.sb_def.value() < self.sb_min.value():
+            self.sb_def.setValue(self.sb_min.value())
+        if self.sb_def.value() > self.sb_max.value():
+            self.sb_def.setValue(self.sb_max.value())
+
+    def changed_def(self):
+        if self.sb_def.value() < self.sb_min.value():
+            self.sb_def.setValue(self.sb_min.value())
+        if self.sb_def.value() > self.sb_max.value():
+            self.sb_def.setValue(self.sb_max.value())
+
+    def get_byte_item(self):
+        byte_name = self.te_name.toPlainText()
+        byte_ = {
+            byte_name:
+                {
+                    'type': 'num',
+                    'def_value': self.sb_def.value(),
+                    'min': self.sb_min.value(),
+                    'max': self.sb_max.value(),
+                    'step': self.sb_step.value(),
+                }
+        }
         return byte_
 
 

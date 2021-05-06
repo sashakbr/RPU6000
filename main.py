@@ -18,6 +18,7 @@ class MainWindow(QMainWindow):
         self.create_cmd_viewer_docker()
         self.create_cmd_creator_docker()
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
+        self.cmd_creator.signal.connect(self.cmd_creator_signal_handling, Qt.QueuedConnection)
         self.cmd_viewer.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
 
     def create_sp(self):
@@ -39,7 +40,6 @@ class MainWindow(QMainWindow):
         self.view_menu.addAction(self.docker_cmd_creator.toggleViewAction())
 
     def sp_signal_handling(self, signal):
-        print(signal.name, signal.value)
         if signal.name == 'cmd':
             print(self.cmd_viewer.cmdtree.currentIndex().row())
 
@@ -49,13 +49,13 @@ class MainWindow(QMainWindow):
             pref = self.cmd_viewer.prefix_check.isChecked()
             self.sp.log_info(cmd_parser(signal.value, self.cmd_viewer.cmd_data, is_prefix_on=pref), 'black')
 
+    def cmd_creator_signal_handling(self, signal):
+        if signal.name == 'saved file':
+            self.cmd_viewer.open_file(signal.value)
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    # msg = QMessageBox()
-    # msg.setIcon(QMessageBox.Warning)
-    # msg.setInformativeText('More information')
-    # msg.show()
     sys.exit(app.exec_())
