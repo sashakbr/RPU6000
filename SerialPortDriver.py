@@ -30,7 +30,7 @@ class SP(QWidget):
         self.__set_events()
 
     def __create_widgets(self):
-        self.setFixedWidth(270)
+        self.setFixedWidth(370)
         self.l_PortName = QLabel("Name")
         self.cb_PortName = QComboBox()
         self.cb_PortName.setFixedSize(80, 22)
@@ -57,11 +57,15 @@ class SP(QWidget):
         # индикатор подключения
         self.pb_con_state = QPushButton()
         self.pb_con_state.setFixedSize(22, 22)
+        self.pb_con_state.setStyleSheet("background-color: grey")
         # история отправленных  и принятых команд команд
         self.te_log = QTextEdit()
         self.te_log.setReadOnly(True)
         # кнопка очистки лога
         self.clear_btn = QPushButton('Clear')
+        self.clear_btn.setIcon(QIcon('icons\\trash.svg'))
+
+
 
     def __set_events(self):
         self.pb_connect.clicked.connect(self.event_connect)

@@ -1,5 +1,6 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QDockWidget
+import os
+from PyQt5.QtWidgets import QApplication, QMainWindow, QDockWidget, QStyleFactory
 from PyQt5.QtCore import Qt, pyqtSignal
 import time
 
@@ -12,11 +13,14 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.resize(800, 800)
+        self.resize(1000, 800)
         self.view_menu = self.menuBar().addMenu("&View")
         self.create_sp()
         self.create_cmd_viewer_docker()
         self.create_cmd_creator_docker()
+        self.setWindowIcon(QIcon('icons\\command.svg.svg'))
+        self.setWindowTitle('Com Client Pro Edition')
+        self.tabifyDockWidget(self.docker_cmd_creator, self.docker_cmd_viewer)
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.cmd_creator.signal.connect(self.cmd_creator_signal_handling, Qt.QueuedConnection)
         self.cmd_viewer.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
@@ -56,6 +60,8 @@ class MainWindow(QMainWindow):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
+    #print(QStyleFactory.keys())
+    app.setStyle('Fusion')
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
