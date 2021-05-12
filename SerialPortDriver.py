@@ -1,6 +1,6 @@
 from PyQt5.QtSerialPort import QSerialPortInfo
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtGui import QIcon, QColor
+from PyQt5.QtGui import QIcon, QColor, QFont
 from PyQt5.QtWidgets import QWidget, QLabel, QComboBox, QPushButton, QTextEdit,\
                             QHBoxLayout, QVBoxLayout, QSpacerItem, QGroupBox, QSizePolicy
 import serial
@@ -23,8 +23,9 @@ class SP(QWidget):
         self.connection = serial.Serial(parity=serial.PARITY_NONE,
                                         stopbits=serial.STOPBITS_ONE,
                                         bytesize=serial.EIGHTBITS,
-                                        timeout=0.1,
-                                        xonxoff=False)
+                                        timeout=2,
+                                        xonxoff=False,
+                                        write_timeout=2)
         self.__create_widgets()
         self.__set_appearance_widget()
         self.__set_events()
@@ -61,6 +62,7 @@ class SP(QWidget):
         # история отправленных  и принятых команд команд
         self.te_log = QTextEdit()
         self.te_log.setReadOnly(True)
+        self.te_log.setFont(QFont('Courier New', 9))
         # кнопка очистки лога
         self.clear_btn = QPushButton('Clear')
         self.clear_btn.setIcon(QIcon('icons\\trash.svg'))
@@ -110,6 +112,8 @@ class SP(QWidget):
             self.signal.emit(signal_type('sp state', 'closed'))
             self.pb_con_state.setStyleSheet("background-color: grey")
             self.pb_connect.setText('Open')
+            self.cb_BaudRate.setDisabled(False)
+            self.cb_PortName.setDisabled(False)
             self.log_info(f'Serial port {portName} is close!', 'orange')
         else:
             state = self.open_port(portName)
@@ -117,11 +121,15 @@ class SP(QWidget):
                 self.signal.emit(signal_type('sp state', 'opened'))
                 self.pb_con_state.setStyleSheet("background-color: green")
                 self.pb_connect.setText('Close')
+                self.cb_BaudRate.setDisabled(True)
+                self.cb_PortName.setDisabled(True)
                 self.log_info(f'Serial port {portName} is open!', 'green')
             else:
                 self.signal.emit(signal_type('sp state', 'opening failed'))
                 self.pb_con_state.setStyleSheet("background-color: grey")
                 self.pb_connect.setText('Open')
+                self.cb_BaudRate.setDisabled(False)
+                self.cb_PortName.setDisabled(False)
                 self.log_info(f'Serial port {portName} opening failed!', 'red')
 
     def event_update_ports_name(self):

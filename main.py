@@ -19,7 +19,7 @@ class MainWindow(QMainWindow):
         self.create_cmd_viewer_docker()
         self.create_cmd_creator_docker()
         self.setWindowIcon(QIcon('icons\\command.svg.svg'))
-        self.setWindowTitle('Com Client Pro Edition')
+        self.setWindowTitle('Com Client Pro Edition LUXURY')
         self.tabifyDockWidget(self.docker_cmd_creator, self.docker_cmd_viewer)
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.cmd_creator.signal.connect(self.cmd_creator_signal_handling, Qt.QueuedConnection)
@@ -51,7 +51,7 @@ class MainWindow(QMainWindow):
         if signal.name == 'send_cmd':
             read_cmd = self.sp.write_read(signal.value, len(signal.value))
             pref = self.cmd_viewer.prefix_check.isChecked()
-            self.sp.log_info(cmd_parser(signal.value, self.cmd_viewer.cmd_data, is_prefix_on=pref), 'black')
+            self.sp.log_info(cmd_parser(read_cmd, self.cmd_viewer.cmd_data, is_prefix_on=pref), 'black')
 
     def cmd_creator_signal_handling(self, signal):
         if signal.name == 'saved file':
