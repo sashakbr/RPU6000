@@ -6,7 +6,7 @@ import time
 
 import SerialPortDriver
 from Command_module import *
-from service import *
+from utility import *
 
 
 class MainWindow(QMainWindow):
@@ -17,13 +17,18 @@ class MainWindow(QMainWindow):
         self.view_menu = self.menuBar().addMenu("&View")
         self.create_sp()
         self.create_cmd_viewer_docker()
-        self.create_cmd_creator_docker()
+        self.cmd_creator = CmdCreatorWidget()
+        #self.create_cmd_creator_docker()
         self.setWindowIcon(QIcon('icons\\command.svg.svg'))
         self.setWindowTitle('Com Client Pro Edition LUXURY')
-        self.tabifyDockWidget(self.docker_cmd_creator, self.docker_cmd_viewer)
+        #self.tabifyDockWidget(self.docker_cmd_creator, self.docker_cmd_viewer)
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.cmd_creator.signal.connect(self.cmd_creator_signal_handling, Qt.QueuedConnection)
         self.cmd_viewer.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
+        self.cmd_viewer.add_cmd_btn.clicked.connect(self.open_creator)
+
+    def open_creator(self):
+        self.cmd_creator.show()
 
     def create_sp(self):
         self.sp = SerialPortDriver.SP()

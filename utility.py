@@ -1,7 +1,34 @@
 from collections import namedtuple
+from PyQt5.QtWidgets import (
+                                QDialog,
+                                QDialogButtonBox,
+                                QLabel,
+                                QVBoxLayout,
+                            )
+from PyQt5.QtGui import QFont
 
 signal_type = namedtuple('Signal', ['name', 'value'])
 
+class CustomDialog(QDialog):
+    def __init__(self, text: str, parent=None):
+        super().__init__(parent=parent)
+
+        self.setWindowTitle("Warning!")
+
+        QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        self.layout = QVBoxLayout()
+        message = QLabel(text)
+        font_ = message.font()
+        font_.setPointSize(11)
+        message.setFont(font_)
+        self.layout.addWidget(message)
+        self.layout.addWidget(self.buttonBox)
+        self.setLayout(self.layout)
 
 def uint_to_bytes(number: int):
     """

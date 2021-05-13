@@ -2,9 +2,10 @@ from PyQt5.QtSerialPort import QSerialPortInfo
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QIcon, QColor, QFont
 from PyQt5.QtWidgets import QWidget, QLabel, QComboBox, QPushButton, QTextEdit,\
-                            QHBoxLayout, QVBoxLayout, QSpacerItem, QGroupBox, QSizePolicy
+                            QHBoxLayout, QVBoxLayout, QSpacerItem, QGroupBox, QSizePolicy, QApplication, QDialog, QDialogButtonBox
 import serial
-from service import *
+from utility import *
+from SP_settings import *
 
 
 def get_available_ports():
@@ -23,14 +24,44 @@ class SP(QWidget):
         self.connection = serial.Serial(parity=serial.PARITY_NONE,
                                         stopbits=serial.STOPBITS_ONE,
                                         bytesize=serial.EIGHTBITS,
-                                        timeout=2,
-                                        xonxoff=False,
-                                        write_timeout=2)
-        self.__create_widgets()
-        self.__set_appearance_widget()
-        self.__set_events()
+                                        timeout=0.05,
+                                        xonxoff=False)
+        self._create_widgets()
+        self._set_widget_layouts()
+        self._set_events()
+        self._create_settings_widget()
+        self.update_baudrate()
 
-    def __create_widgets(self):
+    def _create_settings_widget(self):
+        self.settings_ui = Ui_Dialog()
+        self.settings_dialog = QDialog()
+        self.settings_ui.setupUi(self.settings_dialog)
+        self.settings_ui.cb_bytesize.addItem('8 BITS', serial.EIGHTBITS)
+        self.settings_ui.cb_bytesize.addItem('7 BITS', serial.SEVENBITS)
+        self.settings_ui.cb_bytesize.addItem('6 BITS', serial.SIXBITS)
+        self.settings_ui.cb_bytesize.addItem('5 BITS', serial.FIVEBITS)
+
+        self.settings_ui.cb_stopbits.addItem('1', serial.STOPBITS_ONE)
+        self.settings_ui.cb_stopbits.addItem('2', serial.STOPBITS_TWO)
+        self.settings_ui.cb_stopbits.addItem('1.5', serial.STOPBITS_ONE_POINT_FIVE)
+
+        self.settings_ui.cb_parity.addItem('NONE', serial.PARITY_NONE)
+        self.settings_ui.cb_parity.addItem('ODD', serial.PARITY_ODD)
+        self.settings_ui.cb_parity.addItem('SPACE', serial.PARITY_SPACE)
+        self.settings_ui.cb_parity.addItem('EVEN', serial.PARITY_EVEN)
+        self.settings_ui.cb_parity.addItem('NAMES', serial.PARITY_NAMES)
+
+        self.settings_ui.buttonBox.button(QDialogButtonBox.Ok).clicked.connect(self.set_settings)
+        self.settings_ui.buttonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.settings_dialog.close)
+
+    def set_settings(self):
+        self.connection.timeout = self.settings_ui.dsb_timeout.value()
+        self.connection.parity = self.settings_ui.cb_parity.currentData()
+        self.connection.stopbits = self.settings_ui.cb_stopbits.currentData()
+        self.connection.bytesize = self.settings_ui.cb_bytesize.currentData()
+        self.settings_dialog.close()
+
+    def _create_widgets(self):
         self.setFixedWidth(370)
         self.l_PortName = QLabel("Name")
         self.cb_PortName = QComboBox()
@@ -39,7 +70,7 @@ class SP(QWidget):
 
         self.update_port_name_btn = QPushButton()
         self.update_port_name_btn.setIcon(QIcon('icons\\refresh.png'))
-        self.update_port_name_btn.setFixedSize(22, 22)
+        self.update_port_name_btn.setFixedSize(26, 26)
 
         self.l_BaudRate = QLabel('Baudrate')
         self.cb_BaudRate = QComboBox()
@@ -55,9 +86,14 @@ class SP(QWidget):
 
         self.pb_connect = QPushButton("Open")
         self.pb_connect.setFixedSize(80, 30)
+
+        # кнопка дополнительных настроек COM порта
+        self.pb_settings = QPushButton()
+        self.pb_settings.setIcon(QIcon('icons\\settings.svg'))
+        self.pb_settings.setFixedSize(26, 26)
         # индикатор подключения
         self.pb_con_state = QPushButton()
-        self.pb_con_state.setFixedSize(22, 22)
+        self.pb_con_state.setFixedSize(26, 26)
         self.pb_con_state.setStyleSheet("background-color: grey")
         # история отправленных  и принятых команд команд
         self.te_log = QTextEdit()
@@ -67,14 +103,14 @@ class SP(QWidget):
         self.clear_btn = QPushButton('Clear')
         self.clear_btn.setIcon(QIcon('icons\\trash.svg'))
 
-
-
-    def __set_events(self):
+    def _set_events(self):
         self.pb_connect.clicked.connect(self.event_connect)
         self.clear_btn.clicked.connect(lambda: self.te_log.clear())
         self.update_port_name_btn.clicked.connect(self.event_update_ports_name)
+        self.pb_settings.clicked.connect(self.event_settings)
+        self.cb_BaudRate.currentIndexChanged.connect(self.update_baudrate)
 
-    def __set_appearance_widget(self):
+    def _set_widget_layouts(self):
         self.sp_layout = QVBoxLayout()
         self.setLayout(self.sp_layout)
 
@@ -87,6 +123,8 @@ class SP(QWidget):
         layout1.addWidget(self.cb_PortName)
 
         layout2.addWidget(self.l_BaudRate)
+        layout2.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        layout2.addWidget(self.pb_settings)
         layout2.addWidget(self.cb_BaudRate)
 
         layout3.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
@@ -105,6 +143,10 @@ class SP(QWidget):
         self.sp_layout.addWidget(self.te_log)
         self.sp_layout.addWidget(self.clear_btn)
 
+    def event_settings(self):
+        self.settings_dialog.show()
+        self.settings_dialog.exec()
+
     def event_connect(self):
         portName = self.cb_PortName.currentText()
         if self.connection.isOpen():
@@ -112,7 +154,6 @@ class SP(QWidget):
             self.signal.emit(signal_type('sp state', 'closed'))
             self.pb_con_state.setStyleSheet("background-color: grey")
             self.pb_connect.setText('Open')
-            self.cb_BaudRate.setDisabled(False)
             self.cb_PortName.setDisabled(False)
             self.log_info(f'Serial port {portName} is close!', 'orange')
         else:
@@ -121,16 +162,17 @@ class SP(QWidget):
                 self.signal.emit(signal_type('sp state', 'opened'))
                 self.pb_con_state.setStyleSheet("background-color: green")
                 self.pb_connect.setText('Close')
-                self.cb_BaudRate.setDisabled(True)
                 self.cb_PortName.setDisabled(True)
                 self.log_info(f'Serial port {portName} is open!', 'green')
             else:
                 self.signal.emit(signal_type('sp state', 'opening failed'))
                 self.pb_con_state.setStyleSheet("background-color: grey")
                 self.pb_connect.setText('Open')
-                self.cb_BaudRate.setDisabled(False)
                 self.cb_PortName.setDisabled(False)
                 self.log_info(f'Serial port {portName} opening failed!', 'red')
+
+    def update_baudrate(self):
+        self.connection.baudrate = self.cb_BaudRate.currentData()
 
     def event_update_ports_name(self):
         self.cb_PortName.clear()

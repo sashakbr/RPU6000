@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QComboBox, QLabel, QTextEdit, QListWidget, QGridLay
                              QListWidgetItem, QMessageBox, QLayoutItem, QFrame)
 from PyQt5.QtCore import pyqtSignal, Qt, QSignalMapper, QSize
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon
-from service import *
+from utility import *
 import json
 
 
@@ -17,6 +17,8 @@ class CmdViewerWidget(QWidget):
         self.setWindowIcon(QIcon('icons\\send.svg'))
         self.__create_widgets()
         self.setMinimumWidth(550)
+        self.btns_list = []  # список кнопок в дереве
+        self.cmd_data = None  # словарь вычитанный из файла
 
     def __create_widgets(self):
         self.main_layout = QVBoxLayout()
@@ -28,22 +30,22 @@ class CmdViewerWidget(QWidget):
         self.mapper = QSignalMapper()
 
         file_group = QGroupBox('Command file')
-        self.file_path_lable = QLabel('Path: ')
-        self.file_dialog_btn = QPushButton()
+        self.file_path_lable = QLabel()
+        self.file_dialog_btn = QPushButton('Open')
         self.file_dialog_btn.setShortcut('Ctrl+O')
         self.file_dialog_btn.setToolTip('<b>Open</b> command file .json')
-        self.file_dialog_btn.setFixedSize(40, 30)
-        self.file_dialog_btn.setIcon(QIcon('icons\\file.svg'))
-        self.file_dialog_btn.clicked.connect(self.open_file_dialog)
+        self.file_dialog_btn.setFixedSize(60, 30)
+        self.file_dialog_btn.setIcon(QIcon('icons\\folder.svg'))
         file_layout = QHBoxLayout()
+        file_layout.addWidget(QLabel('Path: '))
         file_layout.addWidget(self.file_path_lable)
+        file_layout.addStretch(1)
         file_layout.addWidget(self.file_dialog_btn)
         file_group.setLayout(file_layout)
 
         prefix_group = QGroupBox('Prefix')
         self.prefix_check = QCheckBox('On')
         self.prefix_check.setChecked(True)
-        self.prefix_check.clicked.connect(self.prefix_check_clicked)
         self.prefix_value = QSpinBox()
         self.prefix_value.setEnabled(True)
         self.prefix_value.setMaximum(255)
@@ -57,12 +59,63 @@ class CmdViewerWidget(QWidget):
         prefix_group.setLayout(prefix_layout)
         prefix_layout.addItem(QSpacerItem(50, 0, QSizePolicy.Minimum, QSizePolicy.Minimum))
 
+        self.del_cmd_btn = QPushButton('Delete')
+        self.del_cmd_btn.setIcon(QIcon('icons\\delete.svg'))
+
+        self.save_btn = QPushButton('Save')
+        self.save_btn.setIcon(QIcon('icons\\save.svg'))
+
+        self.add_cmd_btn = QPushButton('Add')
+        self.add_cmd_btn.setIcon(QIcon('icons\\plus-square.svg'))
+
+        btn_layout = QGridLayout()
+        btn_layout.addWidget(self.add_cmd_btn, 0, 0)
+        btn_layout.addWidget(self.del_cmd_btn, 0, 1)
+        btn_layout.addWidget(self.save_btn, 0, 2)
+
+
         self.main_layout.addWidget(file_group)
         self.main_layout.addWidget(prefix_group)
         self.main_layout.addWidget(self.cmdtree)
+        self.main_layout.addLayout(btn_layout)
+
+
+        self.file_dialog_btn.clicked.connect(self.open_file_dialog)
+        self.prefix_check.clicked.connect(self.prefix_check_clicked)
+        self.del_cmd_btn.clicked.connect(self.del_cmd)
+        self.save_btn.clicked.connect(self.save_file_changes)
+        #self.add_cmd_btn.clicked.connect(self.add_cmd)
+
+    def del_cmd(self):
+        index = self.cmdtree.currentIndex()
+        while index.parent().data() is not None:
+            index = index.parent()
+        cmd_name = index.data()
+        if cmd_name is not None:
+            dialog = CustomDialog('Вы уверенны что хотите удалить эту команду\n\"{}\"?'.format(index.data()))
+            if dialog.exec_():
+                del self.cmd_data[cmd_name]
+                self.fill_tree(self.cmd_data)
+
+    def add_cmd(self):
+        add_widget = CmdViewerWidget()
+        add_widget.show()
+
+    def save_file_changes(self):
+        file_path = self.file_path_lable.text()
+        if file_path != '':
+            with open(file_path, 'w', encoding='utf-8') as fp:
+                json.dump(self.cmd_data, fp, sort_keys=False, indent=4, ensure_ascii=False)
+
+    def clear_tree(self):
+        """ Очистка модели дерева """
+        self.model.clear()
+        if len(self.btns_list):
+            self.mapper.disconnect()
 
     def fill_tree(self, commands):
-        self.model.clear()
+        """ Заполние модели дерева """
+        self.clear_tree()
         i = 0
         for cmd_name, cmd in commands.items():
 
@@ -72,6 +125,7 @@ class CmdViewerWidget(QWidget):
             self.model.appendRow([cmd_name_item, space, send_btn_item])
 
             btn_send = QPushButton('Send')
+            self.btns_list.append(btn_send)
             self.mapper.setMapping(btn_send, i)
             i += 1
             btn_send.clicked.connect(self.mapper.map)
@@ -153,6 +207,8 @@ class CmdViewerWidget(QWidget):
         self.cmdtree.setColumnWidth(1, 140)
 
     def btn_press(self, row_num):
+        """ Функция - обработчик нажатия на кнопку Send напротив команты.
+         Составляет команду и отправляет ее сигналом."""
         command_item = self.model.item(row_num, 0)
         command = b''
         if self.prefix_check.isChecked():
@@ -193,7 +249,7 @@ class CmdViewerWidget(QWidget):
         dir_ = QFileDialog.getOpenFileName(None, 'Open File', '', 'CMD file (*.json)')
         if dir_[0] != '':
             file_path = dir_[0]
-            self.file_path_lable.setText('Path: ' + file_path)
+            self.file_path_lable.setText(file_path)
             self.open_file(file_path)
 
     def open_file(self, path):
@@ -202,6 +258,7 @@ class CmdViewerWidget(QWidget):
             self.fill_tree(self.cmd_data)
 
     def prefix_check_clicked(self):
+        """ Обработчик галочки добавления префикса команде """
         if self.prefix_check.isChecked():
             self.prefix_check.setText("On")
             self.prefix_value.setEnabled(True)
@@ -249,7 +306,7 @@ class CmdCreatorWidget(QWidget):
         layout1 = QHBoxLayout()
         self.btn_clear_cmd = QPushButton('Clear')
         self.btn_clear_cmd.setIcon(QIcon('icons\\trash.svg'))
-        self.btn_save_cmd = QPushButton('Save')
+        self.btn_save_cmd = QPushButton('Save to...')
         self.btn_save_cmd.setIcon(QIcon('icons\\save.svg'))
         layout1.addWidget(self.btn_clear_cmd)
         layout1.addWidget(self.btn_save_cmd)
@@ -294,7 +351,7 @@ class CmdCreatorWidget(QWidget):
         self.btn_add_byte.clicked.connect(self.add_byte)
         self.btn_add_cmd.clicked.connect(self.create_cmd)
         self.btn_clear_cmd.clicked.connect(self.remote_cmd)
-        self.btn_save_cmd.clicked.connect(self.save_cmd)
+        self.btn_save_cmd.clicked.connect(self.save_cmd_to_file)
 
     def create_cmd(self):
         self.cmd_name = self.te_cmd_name.toPlainText()
@@ -316,7 +373,7 @@ class CmdCreatorWidget(QWidget):
         self.model.clear()
         self.cmdtree.setDisabled(True)
 
-    def save_cmd(self):
+    def save_cmd_to_file(self):
         if self.cmd != {}:
             dir_ = QFileDialog.getOpenFileName(None, 'Open File', '', 'CMD file (*.json)')
             if dir_[0] != '':
@@ -854,7 +911,7 @@ class WidgetBitField(QWidget):
 
 
 def cmd_parser(cmd: bytes, protocol: dict, is_prefix_on: bool):
-    if type(cmd) == bytes:
+    if type(cmd) == bytes and len(cmd) != 0:
         count = 0
         res_str = ''
         if is_prefix_on:
