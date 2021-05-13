@@ -19,7 +19,7 @@ class MainWindow(QMainWindow):
         self.create_cmd_viewer_docker()
         self.cmd_creator = CmdCreatorWidget()
         #self.create_cmd_creator_docker()
-        self.setWindowIcon(QIcon('icons\\command.svg.svg'))
+        # self.setWindowIcon(QIcon('icons\\command.svg.svg'))
         self.setWindowTitle('Com Client Pro Edition LUXURY')
         #self.tabifyDockWidget(self.docker_cmd_creator, self.docker_cmd_viewer)
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
