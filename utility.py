@@ -14,7 +14,6 @@ class CustomDialog(QDialog):
         super().__init__(parent=parent)
 
         self.setWindowTitle("Warning!")
-
         QBtn = QDialogButtonBox.Ok | QDialogButtonBox.Cancel
 
         self.buttonBox = QDialogButtonBox(QBtn)
@@ -23,10 +22,26 @@ class CustomDialog(QDialog):
 
         self.layout = QVBoxLayout()
         message = QLabel(text)
-        font_ = message.font()
-        font_.setPointSize(11)
-        message.setFont(font_)
         self.layout.addWidget(message)
+        self.layout.addSpacing(20)
+        self.layout.addWidget(self.buttonBox)
+        self.setLayout(self.layout)
+
+class SaveDialog(QDialog):
+    def __init__(self, text: str, parent=None):
+        super().__init__(parent=parent)
+
+        self.setWindowTitle("Save changes")
+        QBtn = QDialogButtonBox.Save | QDialogButtonBox.Close
+
+        self.buttonBox = QDialogButtonBox(QBtn)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        self.layout = QVBoxLayout()
+        message = QLabel(text)
+        self.layout.addWidget(message)
+        self.layout.addSpacing(20)
         self.layout.addWidget(self.buttonBox)
         self.setLayout(self.layout)
 

@@ -23,12 +23,14 @@ class MainWindow(QMainWindow):
         self.setWindowTitle('Com Client Pro Edition LUXURY')
         #self.tabifyDockWidget(self.docker_cmd_creator, self.docker_cmd_viewer)
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
-        self.cmd_creator.signal.connect(self.cmd_creator_signal_handling, Qt.QueuedConnection)
+        self.cmd_creator.signal_cmd.connect(self.cmd_viewer.add_cmd, Qt.QueuedConnection)
         self.cmd_viewer.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
-        self.cmd_viewer.add_cmd_btn.clicked.connect(self.open_creator)
+        self.cmd_viewer.add_cmd_btn.clicked.connect(self.open_cmd_creator)
 
-    def open_creator(self):
+
+    def open_cmd_creator(self):
         self.cmd_creator.show()
+        self.cmd_creator.resize(600, 600)
 
     def create_sp(self):
         self.sp = SerialPortDriver.SP()
@@ -58,9 +60,9 @@ class MainWindow(QMainWindow):
             pref = self.cmd_viewer.prefix_check.isChecked()
             self.sp.log_info(cmd_parser(read_cmd, self.cmd_viewer.cmd_data, is_prefix_on=pref), 'black')
 
-    def cmd_creator_signal_handling(self, signal):
-        if signal.name == 'saved file':
-            self.cmd_viewer.open_file(signal.value)
+    def closeEvent(self, event):
+        self.cmd_viewer.check_changes()
+        event.accept()
 
 
 if __name__ == '__main__':

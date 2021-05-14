@@ -19,6 +19,7 @@ class CmdViewerWidget(QWidget):
         self.setMinimumWidth(550)
         self.btns_list = []  # список кнопок в дереве
         self.cmd_data = None  # словарь вычитанный из файла
+        self.change_flag = False
 
     def __create_widgets(self):
         self.main_layout = QVBoxLayout()
@@ -62,29 +63,32 @@ class CmdViewerWidget(QWidget):
         self.del_cmd_btn = QPushButton('Delete')
         self.del_cmd_btn.setIcon(QIcon('icons\\delete.svg'))
 
-        self.save_btn = QPushButton('Save')
-        self.save_btn.setIcon(QIcon('icons\\save.svg'))
-
         self.add_cmd_btn = QPushButton('Add')
         self.add_cmd_btn.setIcon(QIcon('icons\\plus-square.svg'))
 
+        self.save_btn = QPushButton('Save')
+        self.save_btn.setDisabled(True)
+        self.save_btn.setIcon(QIcon('icons\\save.svg'))
+
+        self.save_to_btn = QPushButton('Save to..')
+        self.save_to_btn.setIcon(QIcon('icons\\save.svg'))
+
         btn_layout = QGridLayout()
         btn_layout.addWidget(self.add_cmd_btn, 0, 0)
-        btn_layout.addWidget(self.del_cmd_btn, 0, 1)
+        btn_layout.addWidget(self.del_cmd_btn, 1, 0)
         btn_layout.addWidget(self.save_btn, 0, 2)
-
+        btn_layout.addWidget(self.save_to_btn, 1, 2)
 
         self.main_layout.addWidget(file_group)
         self.main_layout.addWidget(prefix_group)
         self.main_layout.addWidget(self.cmdtree)
         self.main_layout.addLayout(btn_layout)
 
-
         self.file_dialog_btn.clicked.connect(self.open_file_dialog)
         self.prefix_check.clicked.connect(self.prefix_check_clicked)
         self.del_cmd_btn.clicked.connect(self.del_cmd)
         self.save_btn.clicked.connect(self.save_file_changes)
-        #self.add_cmd_btn.clicked.connect(self.add_cmd)
+        self.save_to_btn.clicked.connect(self.save_to)
 
     def del_cmd(self):
         index = self.cmdtree.currentIndex()
@@ -96,16 +100,29 @@ class CmdViewerWidget(QWidget):
             if dialog.exec_():
                 del self.cmd_data[cmd_name]
                 self.fill_tree(self.cmd_data)
+                self.change_flag = True
 
-    def add_cmd(self):
-        add_widget = CmdViewerWidget()
-        add_widget.show()
+    def add_cmd(self, cmd):
+        if self.cmd_data is None:
+            self.cmd_data = {}
+        self.cmd_data.update(cmd)
+        self.fill_tree(self.cmd_data)
+        self.change_flag = True
 
     def save_file_changes(self):
         file_path = self.file_path_lable.text()
         if file_path != '':
             with open(file_path, 'w', encoding='utf-8') as fp:
                 json.dump(self.cmd_data, fp, sort_keys=False, indent=4, ensure_ascii=False)
+            self.change_flag = False
+
+    def save_to(self):
+        dir_ = QFileDialog.getOpenFileName(None, 'Save File', '', 'CMD file (*.json)')
+        if dir_[0] != '':
+            file_path = dir_[0]
+            with open(file_path, 'w', encoding='utf-8') as fp:
+                json.dump(self.cmd_data, fp, sort_keys=False, indent=4, ensure_ascii=False)
+            self.change_flag = False
 
     def clear_tree(self):
         """ Очистка модели дерева """
@@ -246,11 +263,13 @@ class CmdViewerWidget(QWidget):
         self.signal.emit(signal_type('send_cmd', command))
 
     def open_file_dialog(self):
+        self.check_changes()
         dir_ = QFileDialog.getOpenFileName(None, 'Open File', '', 'CMD file (*.json)')
         if dir_[0] != '':
             file_path = dir_[0]
             self.file_path_lable.setText(file_path)
             self.open_file(file_path)
+            self.save_btn.setDisabled(False)
 
     def open_file(self, path):
         with open(path, 'r', encoding='utf-8') as f:
@@ -266,15 +285,23 @@ class CmdViewerWidget(QWidget):
             self.prefix_check.setText('Off')
             self.prefix_value.setEnabled(False)
 
+    def check_changes(self):
+        if self.change_flag is True:
+            dialog = SaveDialog("You haven't saved changes. Do you want to save?")
+            if dialog.exec_():
+                self.save_to()
+
 
 class CmdCreatorWidget(QWidget):
-    signal = pyqtSignal(signal_type)
+    signal_cmd = pyqtSignal(dict)
 
     def __init__(self):
         super().__init__()
+        self.setWindowTitle('Command creator')
         self.__create_widgets()
         self.create_stack_widgets()
         self.cmd = {}
+        self.cmd_name = None
 
     def __create_widgets(self):
         self.main_layout = QVBoxLayout()
@@ -290,7 +317,7 @@ class CmdCreatorWidget(QWidget):
         self.sb_cmd_num.setDisplayIntegerBase(16)
         self.sb_cmd_num.setMaximumHeight(40)
         self.btn_add_cmd = QPushButton('Create')
-        self.btn_add_cmd.setIcon(QIcon('icons\\pl'))
+        #self.btn_add_cmd.setIcon(QIcon('icons\\pl'))
         add_layout.addWidget(QLabel('Name: '))
         add_layout.addWidget(self.te_cmd_name)
         add_layout.addWidget(QLabel('Number: '))
@@ -299,6 +326,7 @@ class CmdCreatorWidget(QWidget):
 
         self.cmdtree = QTreeView()
         self.cmdtree.setDisabled(True)
+        self.cmdtree.setMinimumHeight(200)
         self.model = QStandardItemModel()
         self.cmdtree.setModel(self.model)
         self.main_layout.addWidget(self.cmdtree)
@@ -306,10 +334,9 @@ class CmdCreatorWidget(QWidget):
         layout1 = QHBoxLayout()
         self.btn_clear_cmd = QPushButton('Clear')
         self.btn_clear_cmd.setIcon(QIcon('icons\\trash.svg'))
-        self.btn_save_cmd = QPushButton('Save to...')
-        self.btn_save_cmd.setIcon(QIcon('icons\\save.svg'))
+
         layout1.addWidget(self.btn_clear_cmd)
-        layout1.addWidget(self.btn_save_cmd)
+        layout1.addStretch(1)
         self.main_layout.addLayout(layout1)
 
         self.lw_byte_type = QListWidget()
@@ -333,7 +360,7 @@ class CmdCreatorWidget(QWidget):
         self.layout_stack.addWidget(group_byte_type)
 
         layout2.addWidget(self.lw_byte_type)
-        layout2.addStretch(1)
+        #layout2.addStretch(1)
         layout2.addWidget(self.btn_add_byte)
 
         v_line = QFrame()
@@ -347,11 +374,17 @@ class CmdCreatorWidget(QWidget):
         layout3.addWidget(self.stack)
         self.layout_stack.addWidget(gb_byte_description)
 
+        self.buttonBox = QDialogButtonBox()
+        self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel | QDialogButtonBox.Ok)
+        self.main_layout.addSpacing(40)
+        self.main_layout.addWidget(self.buttonBox)
+
         self.lw_byte_type.currentRowChanged.connect(lambda i:  self.stack.setCurrentIndex(i))
         self.btn_add_byte.clicked.connect(self.add_byte)
         self.btn_add_cmd.clicked.connect(self.create_cmd)
         self.btn_clear_cmd.clicked.connect(self.remote_cmd)
-        self.btn_save_cmd.clicked.connect(self.save_cmd_to_file)
+        self.buttonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.close)
+        self.buttonBox.button(QDialogButtonBox.Ok).clicked.connect(lambda: self.signal_cmd.emit(self.cmd))
 
     def create_cmd(self):
         self.cmd_name = self.te_cmd_name.toPlainText()
@@ -372,24 +405,6 @@ class CmdCreatorWidget(QWidget):
         self.cmd = {}
         self.model.clear()
         self.cmdtree.setDisabled(True)
-
-    def save_cmd_to_file(self):
-        if self.cmd != {}:
-            dir_ = QFileDialog.getOpenFileName(None, 'Open File', '', 'CMD file (*.json)')
-            if dir_[0] != '':
-                file_path = dir_[0]
-                with open(file_path, 'r', encoding='utf-8') as fp:
-                    file_data = json.load(fp)
-                    file_data.update(self.cmd)
-                with open(file_path, 'w', encoding='utf-8') as fp:
-                    json.dump(file_data, fp, sort_keys=False, indent=4, ensure_ascii=False)
-                    self.signal.emit(signal_type('saved file', file_path))
-        else:
-            msg = QMessageBox()
-            msg.setIcon(QMessageBox.Information)
-            msg.setWindowTitle('Info')
-            msg.setText('First, create a command.')
-            msg.exec()
 
     def add_byte(self):
         if self.cmd != {}:
@@ -484,6 +499,7 @@ class CmdCreatorWidget(QWidget):
         self.model.setHorizontalHeaderLabels(['Names', 'Values'])
         self.cmdtree.setColumnWidth(0, 200)
         self.cmdtree.setColumnWidth(1, 200)
+        self.cmdtree.expandToDepth(1)
 
     def create_stack_widgets(self):
         self.widget_enum = WidgetEnum()
@@ -503,14 +519,16 @@ class WidgetEnum(QWidget):
         super().__init__()
         self.type_ = type_
         self.__create_widgets()
-        self.item_add.clicked.connect(self.add_item_to_list)
+        self.pb_item_add.clicked.connect(self.add_item)
+        self.pb_item_del.clicked.connect(self.del_item)
+        self.pb_clear_list.clicked.connect(self.clear_list)
         self.items = {}
 
     def __create_widgets(self):
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
 
-        lable_name = QLabel('Enum name:')
+        lable_name = QLabel('Name:')
         self.te_name = QTextEdit('Some enum name')
         self.te_name.setMaximumHeight(24)
         layout_name = QHBoxLayout()
@@ -534,30 +552,47 @@ class WidgetEnum(QWidget):
             layout_2.addStretch(1)
             self.main_layout.addLayout(layout_2)
 
-        group_box = QGroupBox('Values')
+        group_box = QGroupBox()
         self.main_layout.addWidget(group_box)
 
         gb_layout = QVBoxLayout()
         group_box.setLayout(gb_layout)
         self.items_list = QListWidget()
-        gb_layout.addWidget(self.items_list)
+
         add_layout = QHBoxLayout()
         gb_layout.addLayout(add_layout)
+        gb_layout.addWidget(self.items_list)
         self.item_value = QSpinBox()
         self.item_value.setMaximum(0xFF)
         self.item_value.setPrefix('0x')
         self.item_value.setDisplayIntegerBase(16)
         self.item_value.setMinimumWidth(50)
         #self.item_value.setMaximumHeight(40)
-        self.item_name = QTextEdit('Name')
+
+        self.item_name = QTextEdit('Item name')
         self.item_name.setMaximumHeight(24)
-        self.item_add = QPushButton('Add')
-        self.item_add.setIcon(QIcon('icons\\plus.svg'))
-        add_layout.addWidget(QLabel('Value'))
-        add_layout.addWidget(self.item_value)
-        add_layout.addWidget(QLabel('Item name'))
+
+        self.pb_item_add = QPushButton('Add')
+        self.pb_item_add.setIcon(QIcon('icons\\plus.svg'))
+
+        self.pb_item_del = QPushButton('Delete')
+        self.pb_item_del.setIcon(QIcon('icons\\delete.svg'))
+
+        self.pb_clear_list = QPushButton('Clear')
+        self.pb_clear_list.setIcon(QIcon('icons\\trash.svg'))
+
+        add_layout.addWidget(QLabel('Name'))
         add_layout.addWidget(self.item_name)
-        add_layout.addWidget(self.item_add)
+        add_layout.addWidget(QLabel('Num'))
+        add_layout.addWidget(self.item_value)
+        add_layout.addWidget(self.pb_item_add)
+
+        layout_3 = QHBoxLayout()
+        self.main_layout.addLayout(layout_3)
+
+        layout_3.addWidget(self.pb_item_del)
+        layout_3.addWidget(self.pb_clear_list)
+        layout_3.addStretch(1)
 
         if self.type_ == 'bit':
             self.btn_ok = QPushButton('Ok')
@@ -573,7 +608,7 @@ class WidgetEnum(QWidget):
             self.main_layout.addSpacing(50)
             self.main_layout.addLayout(layout_ok_cancel)
 
-    def add_item_to_list(self):
+    def add_item(self):
         name = self.item_name.toPlainText()
         data = self.item_value.value()
         self.items.update({name: data})
@@ -582,6 +617,18 @@ class WidgetEnum(QWidget):
             item = QListWidgetItem(name_)
             item.setData(3, data_)
             self.items_list.addItem(item)
+
+    def del_item(self):
+        all_items = self.items_list.selectedItems()
+        if not all_items:
+            return
+        for item in all_items:
+            self.items_list.takeItem(self.items_list.row(item))
+            del self.items[item.text()]
+
+    def clear_list(self):
+        self.items_list.clear()
+        self.items = {}
 
     def get_byte_item(self):
         byte_name = self.te_name.toPlainText()
@@ -592,8 +639,6 @@ class WidgetEnum(QWidget):
                 'values': self.items
             }
         }
-        self.items = {}
-        self.items_list.clear()
         return byte_
 
     def get_bit_item(self):
@@ -607,8 +652,6 @@ class WidgetEnum(QWidget):
                     'values': self.items
                 }
         }
-        self.items = {}
-        self.items_list.clear()
         return bit_
 
     def btn_ok_clicked(self):
@@ -628,7 +671,7 @@ class WidgetBool(QWidget):
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
 
-        lable_name = QLabel('Bool name:')
+        lable_name = QLabel('Name:')
         self.te_name = QTextEdit('Some bool name')
         self.te_name.setMaximumHeight(24)
         layout_name = QHBoxLayout()
@@ -720,7 +763,7 @@ class WidgetNum(QWidget):
         self.main_layout = QGridLayout()
         self.setLayout(self.main_layout)
 
-        lable_name = QLabel('Numeric name:')
+        lable_name = QLabel('Name:')
         self.te_name = QTextEdit('Some numeric name')
         self.te_name.setMaximumHeight(24)
 
@@ -803,7 +846,7 @@ class WidgetNum(QWidget):
         return byte_
 
 
-class WidgetBitField(QWidget):
+class WidgetBitField(QDialog):
     signal = pyqtSignal(signal_type)
 
     def __init__(self):
@@ -816,30 +859,31 @@ class WidgetBitField(QWidget):
         self.setLayout(self.main_layout)
 
         add_layout = QHBoxLayout()
-        self.main_layout.addLayout(add_layout)
         self.te_byte_name = QTextEdit('Some bit field name')
         self.te_byte_name.setMaximumHeight(24)
         self.btn_create_byte = QPushButton('Create')
         self.btn_create_byte.setIcon(QIcon('icons\\pl'))
         self.btn_clear_byte = QPushButton('Clear')
         self.btn_clear_byte.setIcon(QIcon('icons\\trash.svg'))
+
         add_layout.addWidget(QLabel('Name: '))
         add_layout.addWidget(self.te_byte_name)
-        add_layout.addWidget(QLabel('Number: '))
         add_layout.addWidget(self.btn_create_byte)
         add_layout.addWidget(self.btn_clear_byte)
 
         self.cmdtree = QTreeView()
         self.model = QStandardItemModel()
         self.cmdtree.setModel(self.model)
-        self.main_layout.addWidget(self.cmdtree)
 
         self.btn_add_bool = QPushButton('Add bool')
         self.btn_add_bool.setIcon(QIcon('icons\\plus.svg'))
         self.btn_add_enum = QPushButton('Add enum')
         self.btn_add_enum.setIcon(QIcon('icons\\plus.svg'))
-        self.main_layout.addWidget(self.btn_add_bool)
-        self.main_layout.addWidget(self.btn_add_enum)
+
+        layout_2 = QHBoxLayout()
+        layout_2.addWidget(self.btn_add_bool)
+        layout_2.addWidget(self.btn_add_enum)
+        layout_2.addStretch(1)
 
         self.btn_create_byte.clicked.connect(self.create_byte)
         self.btn_clear_byte.clicked.connect(self.remote_byte)
@@ -847,6 +891,10 @@ class WidgetBitField(QWidget):
         self.btn_add_enum.clicked.connect(self.bit_enum.show)
         self.bit_bool.signal.connect(self.add_item, Qt.QueuedConnection)
         self.bit_enum.signal.connect(self.add_item, Qt.QueuedConnection)
+
+        self.main_layout.addLayout(add_layout)
+        self.main_layout.addWidget(self.cmdtree)
+        self.main_layout.addLayout(layout_2)
 
     def add_item(self, signal):
         if self.byte_ != {}:
@@ -905,6 +953,7 @@ class WidgetBitField(QWidget):
                     self.cmdtree.setIndexWidget(bit_widget_index, check)
         self.model.setHorizontalHeaderLabels(['Names', 'Values'])
         self.cmdtree.setColumnWidth(0, 250)
+        self.cmdtree.expandToDepth(1)
 
     def get_byte_item(self):
         return self.byte_
