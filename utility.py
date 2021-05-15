@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QFont
 
 signal_type = namedtuple('Signal', ['name', 'value'])
+signal_cmd = namedtuple('CMD', ['name', 'value', 'position'])
 
 class CustomDialog(QDialog):
     def __init__(self, text: str, parent=None):
@@ -82,9 +83,19 @@ def get_bits_from_byte(byte_, pos_start, quantity):
     return (mask & byte_) >> pos_start
 
 
+def insert_item_to_dict(dict_: dict, position: int, items: dict):
+    list_ = list(dict_.items())
+    for item in list(items.items()):
+        list_.insert(position, item)
+        position += 1
+    return dict(list_)
+
+
 if __name__ == '__main__':
    # print(cmd_parser(b'\x00\x9e\x01\xaa\x00', commands, True))
    # print(bit_change(1, 1, True))
    #print(int_to_bool_list(3))
    #print(get_bit_from_int(0b01010010, 0))
    print(get_bits_from_byte(0b01010010, 2, 5))
+   print(insert_item_to_dict({1: 2, 2: 3, 3: 4}, 1, {5: 6, 6: 7}))
+

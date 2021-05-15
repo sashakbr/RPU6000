@@ -2,7 +2,8 @@ from PyQt5.QtSerialPort import QSerialPortInfo
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QIcon, QColor, QFont
 from PyQt5.QtWidgets import QWidget, QLabel, QComboBox, QPushButton, QTextEdit,\
-                            QHBoxLayout, QVBoxLayout, QSpacerItem, QGroupBox, QSizePolicy, QApplication, QDialog, QDialogButtonBox
+                            QHBoxLayout, QVBoxLayout, QSpacerItem, QGroupBox, QSizePolicy,\
+                            QApplication, QDialog, QDialogButtonBox, QCheckBox
 import serial
 from utility import *
 from SP_settings import *
@@ -31,35 +32,6 @@ class SP(QWidget):
         self._set_events()
         self._create_settings_widget()
         self.update_baudrate()
-
-    def _create_settings_widget(self):
-        self.settings_ui = Ui_Dialog()
-        self.settings_dialog = QDialog()
-        self.settings_ui.setupUi(self.settings_dialog)
-        self.settings_ui.cb_bytesize.addItem('8 BITS', serial.EIGHTBITS)
-        self.settings_ui.cb_bytesize.addItem('7 BITS', serial.SEVENBITS)
-        self.settings_ui.cb_bytesize.addItem('6 BITS', serial.SIXBITS)
-        self.settings_ui.cb_bytesize.addItem('5 BITS', serial.FIVEBITS)
-
-        self.settings_ui.cb_stopbits.addItem('1', serial.STOPBITS_ONE)
-        self.settings_ui.cb_stopbits.addItem('2', serial.STOPBITS_TWO)
-        self.settings_ui.cb_stopbits.addItem('1.5', serial.STOPBITS_ONE_POINT_FIVE)
-
-        self.settings_ui.cb_parity.addItem('NONE', serial.PARITY_NONE)
-        self.settings_ui.cb_parity.addItem('ODD', serial.PARITY_ODD)
-        self.settings_ui.cb_parity.addItem('SPACE', serial.PARITY_SPACE)
-        self.settings_ui.cb_parity.addItem('EVEN', serial.PARITY_EVEN)
-        self.settings_ui.cb_parity.addItem('NAMES', serial.PARITY_NAMES)
-
-        self.settings_ui.buttonBox.button(QDialogButtonBox.Ok).clicked.connect(self.set_settings)
-        self.settings_ui.buttonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.settings_dialog.close)
-
-    def set_settings(self):
-        self.connection.timeout = self.settings_ui.dsb_timeout.value()
-        self.connection.parity = self.settings_ui.cb_parity.currentData()
-        self.connection.stopbits = self.settings_ui.cb_stopbits.currentData()
-        self.connection.bytesize = self.settings_ui.cb_bytesize.currentData()
-        self.settings_dialog.close()
 
     def _create_widgets(self):
         self.setFixedWidth(370)
@@ -102,13 +74,10 @@ class SP(QWidget):
         # кнопка очистки лога
         self.clear_btn = QPushButton('Clear')
         self.clear_btn.setIcon(QIcon('icons\\trash.svg'))
+        # галочка включения парсинга принятой команды согласно команд в дереве
+        self.cb_parsing = QCheckBox('Parsing')
+        self.cb_parsing.setFixedSize(60, 15)
 
-    def _set_events(self):
-        self.pb_connect.clicked.connect(self.event_connect)
-        self.clear_btn.clicked.connect(lambda: self.te_log.clear())
-        self.update_port_name_btn.clicked.connect(self.event_update_ports_name)
-        self.pb_settings.clicked.connect(self.event_settings)
-        self.cb_BaudRate.currentIndexChanged.connect(self.update_baudrate)
 
     def _set_widget_layouts(self):
         self.sp_layout = QVBoxLayout()
@@ -139,9 +108,48 @@ class SP(QWidget):
         group_layout.addLayout(layout2)
         group_layout.addLayout(layout3)
 
-        self.sp_layout.addWidget(QLabel("History"))
+        self.sp_layout.addWidget(QLabel("Command log"))
         self.sp_layout.addWidget(self.te_log)
-        self.sp_layout.addWidget(self.clear_btn)
+        layout4 = QHBoxLayout()
+        self.sp_layout.addLayout(layout4)
+        layout4.addWidget(self.cb_parsing)
+        layout4.addWidget(self.clear_btn)
+
+    def _create_settings_widget(self):
+        self.settings_ui = Ui_Dialog()
+        self.settings_dialog = QDialog()
+        self.settings_ui.setupUi(self.settings_dialog)
+        self.settings_ui.cb_bytesize.addItem('8 BITS', serial.EIGHTBITS)
+        self.settings_ui.cb_bytesize.addItem('7 BITS', serial.SEVENBITS)
+        self.settings_ui.cb_bytesize.addItem('6 BITS', serial.SIXBITS)
+        self.settings_ui.cb_bytesize.addItem('5 BITS', serial.FIVEBITS)
+
+        self.settings_ui.cb_stopbits.addItem('1', serial.STOPBITS_ONE)
+        self.settings_ui.cb_stopbits.addItem('2', serial.STOPBITS_TWO)
+        self.settings_ui.cb_stopbits.addItem('1.5', serial.STOPBITS_ONE_POINT_FIVE)
+
+        self.settings_ui.cb_parity.addItem('NONE', serial.PARITY_NONE)
+        self.settings_ui.cb_parity.addItem('ODD', serial.PARITY_ODD)
+        self.settings_ui.cb_parity.addItem('SPACE', serial.PARITY_SPACE)
+        self.settings_ui.cb_parity.addItem('EVEN', serial.PARITY_EVEN)
+        self.settings_ui.cb_parity.addItem('NAMES', serial.PARITY_NAMES)
+
+        self.settings_ui.buttonBox.button(QDialogButtonBox.Ok).clicked.connect(self.set_settings)
+        self.settings_ui.buttonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.settings_dialog.close)
+
+    def set_settings(self):
+        self.connection.timeout = self.settings_ui.dsb_timeout.value()
+        self.connection.parity = self.settings_ui.cb_parity.currentData()
+        self.connection.stopbits = self.settings_ui.cb_stopbits.currentData()
+        self.connection.bytesize = self.settings_ui.cb_bytesize.currentData()
+        self.settings_dialog.close()
+
+    def _set_events(self):
+        self.pb_connect.clicked.connect(self.event_connect)
+        self.clear_btn.clicked.connect(lambda: self.te_log.clear())
+        self.update_port_name_btn.clicked.connect(self.event_update_ports_name)
+        self.pb_settings.clicked.connect(self.event_settings)
+        self.cb_BaudRate.currentIndexChanged.connect(self.update_baudrate)
 
     def event_settings(self):
         self.settings_dialog.show()

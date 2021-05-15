@@ -8,6 +8,11 @@ import SerialPortDriver
 from Command_module import *
 from utility import *
 
+from loguru import logger
+
+logger.debug("That's it, beautiful and simple logging!")
+logger.add("log\\file_1.log", format="{time} {level} {message}", level="DEBUG", rotation="2 MB")
+
 
 class MainWindow(QMainWindow):
 
@@ -24,9 +29,8 @@ class MainWindow(QMainWindow):
         #self.tabifyDockWidget(self.docker_cmd_creator, self.docker_cmd_viewer)
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.cmd_creator.signal_cmd.connect(self.cmd_viewer.add_cmd, Qt.QueuedConnection)
-        self.cmd_viewer.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
+        self.cmd_viewer.signal_bytes.connect(self.cmd_signal_handling, Qt.QueuedConnection)
         self.cmd_viewer.add_cmd_btn.clicked.connect(self.open_cmd_creator)
-
 
     def open_cmd_creator(self):
         self.cmd_creator.show()
@@ -57,8 +61,9 @@ class MainWindow(QMainWindow):
     def cmd_signal_handling(self, signal):
         if signal.name == 'send_cmd':
             read_cmd = self.sp.write_read(signal.value, len(signal.value))
-            pref = self.cmd_viewer.prefix_check.isChecked()
-            self.sp.log_info(cmd_parser(read_cmd, self.cmd_viewer.cmd_data, is_prefix_on=pref), 'black')
+            if self.sp.cb_parsing.isChecked():
+                self.sp.log_info(
+                    cmd_parser(read_cmd, self.cmd_viewer.cmd_data, command_num_position=signal.position), 'black')
 
     def closeEvent(self, event):
         self.cmd_viewer.check_changes()

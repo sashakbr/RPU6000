@@ -1,16 +1,20 @@
 import sys
+
+import self as self
 from PyQt5.QtWidgets import (QComboBox, QLabel, QTextEdit, QListWidget, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget,
                              QPushButton, QSpinBox, QCheckBox, QSlider, QGroupBox, QSpacerItem, QSizePolicy,
                              QMenu, QLCDNumber, QTreeWidget, QTreeWidgetItem, QTreeView, QFileDialog, QStackedWidget,
-                             QListWidgetItem, QMessageBox, QLayoutItem, QFrame)
+                             QListWidgetItem, QMessageBox, QLayoutItem, QFrame, QAbstractItemView)
 from PyQt5.QtCore import pyqtSignal, Qt, QSignalMapper, QSize
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon
 from utility import *
 import json
+import copy
 
 
 class CmdViewerWidget(QWidget):
     signal = pyqtSignal(signal_type)
+    signal_bytes = pyqtSignal(signal_cmd)
 
     def __init__(self):
         super().__init__()
@@ -44,27 +48,15 @@ class CmdViewerWidget(QWidget):
         file_layout.addWidget(self.file_dialog_btn)
         file_group.setLayout(file_layout)
 
-        prefix_group = QGroupBox('Prefix')
-        self.prefix_check = QCheckBox('On')
-        self.prefix_check.setChecked(True)
-        self.prefix_value = QSpinBox()
-        self.prefix_value.setEnabled(True)
-        self.prefix_value.setMaximum(255)
-        self.prefix_value.setMaximumWidth(80)
-        prefix_layout = QHBoxLayout()
-        prefix_layout.addWidget(self.prefix_check)
-        prefix_layout.addSpacing(15)
-        prefix_layout.addWidget(QLabel('Number'))
-        prefix_layout.addWidget(self.prefix_value)
-        prefix_layout.addStretch(1)
-        prefix_group.setLayout(prefix_layout)
-        prefix_layout.addItem(QSpacerItem(50, 0, QSizePolicy.Minimum, QSizePolicy.Minimum))
-
         self.del_cmd_btn = QPushButton('Delete')
         self.del_cmd_btn.setIcon(QIcon('icons\\delete.svg'))
 
         self.add_cmd_btn = QPushButton('Add')
         self.add_cmd_btn.setIcon(QIcon('icons\\plus-square.svg'))
+
+        self.edit_cmd_btn = QPushButton('Edit')
+        self.edit_cmd_btn.setIcon(QIcon('icons\\edit.svg'))
+        #self.edit_cmd_btn.setDisabled(True)
 
         self.save_btn = QPushButton('Save')
         self.save_btn.setDisabled(True)
@@ -76,19 +68,27 @@ class CmdViewerWidget(QWidget):
         btn_layout = QGridLayout()
         btn_layout.addWidget(self.add_cmd_btn, 0, 0)
         btn_layout.addWidget(self.del_cmd_btn, 1, 0)
+        btn_layout.addWidget(self.edit_cmd_btn, 2, 0)
         btn_layout.addWidget(self.save_btn, 0, 2)
         btn_layout.addWidget(self.save_to_btn, 1, 2)
 
         self.main_layout.addWidget(file_group)
-        self.main_layout.addWidget(prefix_group)
         self.main_layout.addWidget(self.cmdtree)
         self.main_layout.addLayout(btn_layout)
 
         self.file_dialog_btn.clicked.connect(self.open_file_dialog)
-        self.prefix_check.clicked.connect(self.prefix_check_clicked)
         self.del_cmd_btn.clicked.connect(self.del_cmd)
+        self.edit_cmd_btn.clicked.connect(self.edit_cmd)
         self.save_btn.clicked.connect(self.save_file_changes)
         self.save_to_btn.clicked.connect(self.save_to)
+
+    def edit_cmd(self):
+        index = self.cmdtree.currentIndex()
+        while index.parent().data() is not None:
+            index = index.parent()
+        cmd_name = index.data()
+        if cmd_name is not None:
+            print({cmd_name: self.cmd_data[cmd_name]})
 
     def del_cmd(self):
         index = self.cmdtree.currentIndex()
@@ -228,12 +228,13 @@ class CmdViewerWidget(QWidget):
          Составляет команду и отправляет ее сигналом."""
         command_item = self.model.item(row_num, 0)
         command = b''
-        if self.prefix_check.isChecked():
-            command += self.prefix_value.value().to_bytes(1, 'little', signed=False)
+        command_num_position = None
         if command_item.hasChildren():
             for i in range(command_item.rowCount()):
                 byte_name_item = command_item.child(i, 0)
                 byte_widget_item = command_item.child(i, 1)
+                if byte_name_item.text() == 'Command num':
+                    command_num_position = i
                 if not byte_name_item.hasChildren():
                     index_ = self.model.indexFromItem(byte_widget_item)
                     widget_ = self.cmdtree.indexWidget(index_)
@@ -260,7 +261,7 @@ class CmdViewerWidget(QWidget):
                             byte_ = bit_change(byte_, widget_.bit_num, widget_.isChecked())
                     command += byte_.to_bytes(1, 'little', signed=False)
 
-        self.signal.emit(signal_type('send_cmd', command))
+        self.signal_bytes.emit(signal_cmd('send_cmd', command, command_num_position))
 
     def open_file_dialog(self):
         self.check_changes()
@@ -275,15 +276,6 @@ class CmdViewerWidget(QWidget):
         with open(path, 'r', encoding='utf-8') as f:
             self.cmd_data = json.load(f)
             self.fill_tree(self.cmd_data)
-
-    def prefix_check_clicked(self):
-        """ Обработчик галочки добавления префикса команде """
-        if self.prefix_check.isChecked():
-            self.prefix_check.setText("On")
-            self.prefix_value.setEnabled(True)
-        else:
-            self.prefix_check.setText('Off')
-            self.prefix_value.setEnabled(False)
 
     def check_changes(self):
         if self.change_flag is True:
@@ -317,7 +309,7 @@ class CmdCreatorWidget(QWidget):
         self.sb_cmd_num.setDisplayIntegerBase(16)
         self.sb_cmd_num.setMaximumHeight(40)
         self.btn_add_cmd = QPushButton('Create')
-        #self.btn_add_cmd.setIcon(QIcon('icons\\pl'))
+        # self.btn_add_cmd.setIcon(QIcon('icons\\pl'))
         add_layout.addWidget(QLabel('Name: '))
         add_layout.addWidget(self.te_cmd_name)
         add_layout.addWidget(QLabel('Number: '))
@@ -335,8 +327,20 @@ class CmdCreatorWidget(QWidget):
         self.btn_clear_cmd = QPushButton('Clear')
         self.btn_clear_cmd.setIcon(QIcon('icons\\trash.svg'))
 
+        self.btn_del_byte = QPushButton('Delete')
+        self.btn_del_byte.setIcon(QIcon('icons\\delete.svg'))
+
+        self.pb_up_byte = QPushButton('Up')
+        self.pb_up_byte.setIcon(QIcon('icons\\chevron-up.svg'))
+
+        self.pb_down_byte = QPushButton('Down')
+        self.pb_down_byte.setIcon(QIcon('icons\\chevron-down.svg'))
+
+        layout1.addWidget(self.btn_del_byte)
         layout1.addWidget(self.btn_clear_cmd)
         layout1.addStretch(1)
+        layout1.addWidget(self.pb_up_byte)
+        layout1.addWidget(self.pb_down_byte)
         self.main_layout.addLayout(layout1)
 
         self.lw_byte_type = QListWidget()
@@ -360,7 +364,7 @@ class CmdCreatorWidget(QWidget):
         self.layout_stack.addWidget(group_byte_type)
 
         layout2.addWidget(self.lw_byte_type)
-        #layout2.addStretch(1)
+        # layout2.addStretch(1)
         layout2.addWidget(self.btn_add_byte)
 
         v_line = QFrame()
@@ -379,32 +383,60 @@ class CmdCreatorWidget(QWidget):
         self.main_layout.addSpacing(40)
         self.main_layout.addWidget(self.buttonBox)
 
-        self.lw_byte_type.currentRowChanged.connect(lambda i:  self.stack.setCurrentIndex(i))
+        self.lw_byte_type.currentRowChanged.connect(lambda i: self.stack.setCurrentIndex(i))
         self.btn_add_byte.clicked.connect(self.add_byte)
         self.btn_add_cmd.clicked.connect(self.create_cmd)
-        self.btn_clear_cmd.clicked.connect(self.remote_cmd)
+        self.btn_del_byte.clicked.connect(self.del_byte)
+        self.btn_clear_cmd.clicked.connect(self.clear_cmds)
+        self.pb_down_byte.clicked.connect(lambda: self.move_byte('down'))
+        self.pb_up_byte.clicked.connect(lambda: self.move_byte('up'))
         self.buttonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.close)
         self.buttonBox.button(QDialogButtonBox.Ok).clicked.connect(lambda: self.signal_cmd.emit(self.cmd))
+
+    def move_byte(self, direction='up'):
+        item = self.cmdtree.currentIndex()
+        if item.parent().data() is not None:  # проверка есть ли у этой записи родитель
+            index = self.cmdtree.currentIndex().row()
+            if index == 0 and direction == 'up':
+                return
+            if direction == 'up':
+                index -= 1
+            elif direction == 'down':
+                index += 1
+            item_dict = copy.deepcopy(self.cmd[self.cmd_name][item.data()])
+            del self.cmd[self.cmd_name][item.data()]
+            self.cmd[self.cmd_name] = insert_item_to_dict(self.cmd[self.cmd_name], index, {item.data(): item_dict})
+            self.fill_tree()
 
     def create_cmd(self):
         self.cmd_name = self.te_cmd_name.toPlainText()
         self.cmd = {
-                    self.cmd_name:
+            self.cmd_name:
+                {
+                    'Command num':
                         {
-                            'Command num':
-                                {
-                                    'type': 'const_num',
-                                    'def_value': self.sb_cmd_num.value(),
-                                },
-                        }
-                    }
+                            'type': 'const_num',
+                            'def_value': self.sb_cmd_num.value(),
+                        },
+                }
+        }
         self.cmdtree.setDisabled(False)
         self.fill_tree()
 
-    def remote_cmd(self):
+    def clear_cmds(self):
         self.cmd = {}
         self.model.clear()
         self.cmdtree.setDisabled(True)
+
+    def del_byte(self):
+        item_name = self.cmdtree.currentIndex().data()
+        if item_name == "Command num":
+            return
+        elif item_name == self.cmd_name:
+            return
+        else:
+            del self.cmd[self.cmd_name][item_name]
+            self.fill_tree()
 
     def add_byte(self):
         if self.cmd != {}:
@@ -567,7 +599,7 @@ class WidgetEnum(QWidget):
         self.item_value.setPrefix('0x')
         self.item_value.setDisplayIntegerBase(16)
         self.item_value.setMinimumWidth(50)
-        #self.item_value.setMaximumHeight(40)
+        # self.item_value.setMaximumHeight(40)
 
         self.item_name = QTextEdit('Item name')
         self.item_name.setMaximumHeight(24)
@@ -634,10 +666,10 @@ class WidgetEnum(QWidget):
         byte_name = self.te_name.toPlainText()
         byte_ = {
             byte_name:
-            {
-                'type': 'enum',
-                'values': self.items
-            }
+                {
+                    'type': 'enum',
+                    'values': self.items
+                }
         }
         return byte_
 
@@ -854,7 +886,7 @@ class WidgetBitField(QDialog):
         self.byte_ = {}
         self.bit_enum = WidgetEnum('bit')
         self.bit_bool = WidgetBool('bit')
-        #self.__create_widgets()
+        # self.__create_widgets()
         self.main_layout = QVBoxLayout()
         self.setLayout(self.main_layout)
 
@@ -921,11 +953,11 @@ class WidgetBitField(QDialog):
     def create_byte(self):
         self.byte_name = self.te_byte_name.toPlainText()
         self.byte_ = {
-                    self.byte_name: {
-                            'type': 'bit_field',
-                            'description': {}
-                          }
-                    }
+            self.byte_name: {
+                'type': 'bit_field',
+                'description': {}
+            }
+        }
         self.fill_tree()
 
     def fill_tree(self):
@@ -959,18 +991,15 @@ class WidgetBitField(QDialog):
         return self.byte_
 
 
-def cmd_parser(cmd: bytes, protocol: dict, is_prefix_on: bool):
+def cmd_parser(cmd: bytes, protocol: dict, command_num_position: int):
     if type(cmd) == bytes and len(cmd) != 0:
-        count = 0
         res_str = ''
-        if is_prefix_on:
-            res_str += 'Device number: ' + str(cmd[count]) + '\n'
-            count += 1
-        command_num = cmd[count]
+        command_num = cmd[command_num_position]
         parser_dict = {}
         for cmd_name, cmd_value in protocol.items():
             parser_dict.update({cmd_value['Command num']['def_value']: cmd_name})
         try:
+            count = 0
             command_name = parser_dict[command_num]
             cmd_bytes_dict = protocol[command_name]
             res_str += 'Command name: ' + command_name + '\r'
@@ -1012,6 +1041,7 @@ def cmd_parser(cmd: bytes, protocol: dict, is_prefix_on: bool):
                 count += 1
             return res_str
         except KeyError:
+            print(TypeError)
             return 'Unknown command!'
     else:
         return 'No response from device!'
