@@ -1,11 +1,9 @@
 import sys
-
-import self as self
 from PyQt5.QtWidgets import (QComboBox, QLabel, QTextEdit, QListWidget, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget,
                              QPushButton, QSpinBox, QCheckBox, QSlider, QGroupBox, QSpacerItem, QSizePolicy,
                              QMenu, QLCDNumber, QTreeWidget, QTreeWidgetItem, QTreeView, QFileDialog, QStackedWidget,
                              QListWidgetItem, QMessageBox, QLayoutItem, QFrame, QAbstractItemView)
-from PyQt5.QtCore import pyqtSignal, Qt, QSignalMapper, QSize
+from PyQt5.QtCore import pyqtSignal, Qt, QSignalMapper, QSize, QSettings
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon
 from utility import *
 import json
@@ -24,6 +22,7 @@ class CmdViewerWidget(QWidget):
         self.btns_list = []  # список кнопок в дереве
         self.cmd_data = None  # словарь вычитанный из файла
         self.change_flag = False
+        self.settings = QSettings('KBRadar', 'ComClientGen3')
 
     def __create_widgets(self):
         self.main_layout = QVBoxLayout()
@@ -89,6 +88,7 @@ class CmdViewerWidget(QWidget):
         cmd_name = index.data()
         if cmd_name is not None:
             print({cmd_name: self.cmd_data[cmd_name]})
+            self.signal.emit(signal_type('edit_cmd', (cmd_name, self.cmd_data[cmd_name])))
 
     def del_cmd(self):
         index = self.cmdtree.currentIndex()
@@ -264,8 +264,12 @@ class CmdViewerWidget(QWidget):
         self.signal_bytes.emit(signal_cmd('send_cmd', command, command_num_position))
 
     def open_file_dialog(self):
+        if self.settings.contains("last_file_path"):
+            last_path = self.settings.value('last_file_path')
+        else:
+            last_path = ''
         self.check_changes()
-        dir_ = QFileDialog.getOpenFileName(None, 'Open File', '', 'CMD file (*.json)')
+        dir_ = QFileDialog.getOpenFileName(None, 'Open File', last_path, 'CMD file (*.json)')
         if dir_[0] != '':
             file_path = dir_[0]
             self.file_path_lable.setText(file_path)
@@ -276,6 +280,7 @@ class CmdViewerWidget(QWidget):
         with open(path, 'r', encoding='utf-8') as f:
             self.cmd_data = json.load(f)
             self.fill_tree(self.cmd_data)
+            self.settings.setValue('last_file_path', path)
 
     def check_changes(self):
         if self.change_flag is True:
@@ -354,7 +359,7 @@ class CmdCreatorWidget(QWidget):
         self.btn_add_byte.setIcon(QIcon('icons\\plus-square.svg'))
         self.stack = QStackedWidget(self)
         self.layout_stack = QHBoxLayout()
-        self.main_layout.addSpacing(20)
+        self.main_layout.addSpacing(30)
         self.main_layout.addLayout(self.layout_stack)
 
         layout2 = QVBoxLayout()
@@ -365,7 +370,8 @@ class CmdCreatorWidget(QWidget):
 
         layout2.addWidget(self.lw_byte_type)
         # layout2.addStretch(1)
-        layout2.addWidget(self.btn_add_byte)
+        #layout2.addWidget(self.btn_add_byte)
+        #layout1.insertWidget(0, self.btn_add_byte)
 
         v_line = QFrame()
         v_line.setFrameShape(QFrame.VLine)
@@ -377,6 +383,8 @@ class CmdCreatorWidget(QWidget):
         gb_byte_description.setLayout(layout3)
         layout3.addWidget(self.stack)
         self.layout_stack.addWidget(gb_byte_description)
+        self.main_layout.addWidget(self.btn_add_byte)
+        self.btn_add_byte.setMinimumHeight(32)
 
         self.buttonBox = QDialogButtonBox()
         self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel | QDialogButtonBox.Ok)
@@ -420,7 +428,6 @@ class CmdCreatorWidget(QWidget):
                         },
                 }
         }
-        self.cmdtree.setDisabled(False)
         self.fill_tree()
 
     def clear_cmds(self):
@@ -464,6 +471,7 @@ class CmdCreatorWidget(QWidget):
 
     def fill_tree(self):
         self.model.clear()
+        self.cmdtree.setDisabled(False)
         i = 0
         for cmd_name, cmd in self.cmd.items():
             cmd_name_item = QStandardItem(cmd_name)
@@ -989,59 +997,3 @@ class WidgetBitField(QDialog):
 
     def get_byte_item(self):
         return self.byte_
-
-
-def cmd_parser(cmd: bytes, protocol: dict, command_num_position: int):
-    if type(cmd) == bytes and len(cmd) != 0:
-        res_str = ''
-        command_num = cmd[command_num_position]
-        parser_dict = {}
-        for cmd_name, cmd_value in protocol.items():
-            parser_dict.update({cmd_value['Command num']['def_value']: cmd_name})
-        try:
-            count = 0
-            command_name = parser_dict[command_num]
-            cmd_bytes_dict = protocol[command_name]
-            res_str += 'Command name: ' + command_name + '\r'
-            for byte_name, description in cmd_bytes_dict.items():
-                res_str += byte_name + ': '
-                if description['type'] == 'const_num':
-                    res_str += str(description['def_value']) + '\r'
-
-                elif description['type'] == 'enum':
-                    my_dict = description['values']
-                    my_dict = {my_dict[k]: k for k in my_dict}
-                    res_str += my_dict[cmd[count]] + '\r'
-
-                elif description['type'] == 'num':
-                    if description['max'] > 0xFF:
-                        res_str += str(cmd[count] + cmd[count + 1] * 0x100) + '\r'
-                        count += 1
-                    else:
-                        res_str += str(cmd[count]) + '\r'
-
-                elif description['type'] == 'bool':
-                    res_str += str(bool(cmd[count])) + '\r'
-
-                elif description['type'] == 'bit_field':
-                    res_str += '\r'
-                    byte_ = cmd[count]
-                    for bit_name, bit_description in description['description'].items():
-                        res_str += bit_name + ': '
-                        if bit_description['type'] == 'bit_bool':
-                            state = get_bit_from_byte(byte_, bit_description['bit_num'])
-                            res_str += str(state) + '\r'
-                        elif bit_description['type'] == 'bit_enum':
-                            my_dict = bit_description['values']
-                            my_dict = {my_dict[k]: k for k in my_dict}
-                            current_num = get_bits_from_byte(byte_, bit_description['start_bit'],
-                                                             bit_description['quantity_bit'])
-                            res_str += my_dict[current_num] + '\r'
-
-                count += 1
-            return res_str
-        except KeyError:
-            print(TypeError)
-            return 'Unknown command!'
-    else:
-        return 'No response from device!'

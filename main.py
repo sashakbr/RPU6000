@@ -19,18 +19,20 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.resize(1000, 800)
+
         self.view_menu = self.menuBar().addMenu("&View")
         self.create_sp()
         self.create_cmd_viewer_docker()
         self.cmd_creator = CmdCreatorWidget()
-        #self.create_cmd_creator_docker()
         # self.setWindowIcon(QIcon('icons\\command.svg.svg'))
-        self.setWindowTitle('Com Client Pro Edition LUXURY')
+        self.setWindowTitle('Com Client Gen3')
         #self.tabifyDockWidget(self.docker_cmd_creator, self.docker_cmd_viewer)
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.cmd_creator.signal_cmd.connect(self.cmd_viewer.add_cmd, Qt.QueuedConnection)
-        self.cmd_viewer.signal_bytes.connect(self.cmd_signal_handling, Qt.QueuedConnection)
+        self.cmd_viewer.signal_bytes.connect(self.cmd_signal_byte_handling, Qt.QueuedConnection)
+        self.cmd_viewer.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
         self.cmd_viewer.add_cmd_btn.clicked.connect(self.open_cmd_creator)
+
 
     def open_cmd_creator(self):
         self.cmd_creator.show()
@@ -47,23 +49,24 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.docker_cmd_viewer)
         self.view_menu.addAction(self.docker_cmd_viewer.toggleViewAction())
 
-    def create_cmd_creator_docker(self):
-        self.cmd_creator = CmdCreatorWidget()
-        self.docker_cmd_creator = QDockWidget('Command creator', self)
-        self.docker_cmd_creator.setWidget(self.cmd_creator)
-        self.addDockWidget(Qt.RightDockWidgetArea, self.docker_cmd_creator)
-        self.view_menu.addAction(self.docker_cmd_creator.toggleViewAction())
-
     def sp_signal_handling(self, signal):
         if signal.name == 'cmd':
             print(self.cmd_viewer.cmdtree.currentIndex().row())
 
-    def cmd_signal_handling(self, signal):
+    def cmd_signal_byte_handling(self, signal):
         if signal.name == 'send_cmd':
             read_cmd = self.sp.write_read(signal.value, len(signal.value))
             if self.sp.cb_parsing.isChecked():
                 self.sp.log_info(
                     cmd_parser(read_cmd, self.cmd_viewer.cmd_data, command_num_position=signal.position), 'black')
+
+    def cmd_signal_handling(self, signal):
+        print(signal.name)
+        if signal.name == 'edit_cmd':
+            self.cmd_creator.cmd = dict([signal.value])
+            self.cmd_creator.cmd_name = signal.value[0]
+            self.cmd_creator.fill_tree()
+            self.cmd_creator.show()
 
     def closeEvent(self, event):
         self.cmd_viewer.check_changes()
@@ -72,7 +75,6 @@ class MainWindow(QMainWindow):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    #print(QStyleFactory.keys())
     app.setStyle('Fusion')
     window = MainWindow()
     window.show()
