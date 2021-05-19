@@ -33,7 +33,7 @@ class CmdViewerWidget(QWidget):
         self.cmdtree.setModel(self.model)
         self.mapper = QSignalMapper()
 
-        file_group = QGroupBox('Command file')
+        file_group = QGroupBox()
         self.file_path_lable = QLabel()
         self.file_dialog_btn = QPushButton('Open')
         self.file_dialog_btn.setShortcut('Ctrl+O')
@@ -47,6 +47,8 @@ class CmdViewerWidget(QWidget):
         file_layout.addWidget(self.file_dialog_btn)
         file_group.setLayout(file_layout)
 
+        self.l_current_cmd = QLabel()
+
         self.del_cmd_btn = QPushButton('Delete')
         self.del_cmd_btn.setIcon(QIcon('icons\\delete.svg'))
 
@@ -57,29 +59,29 @@ class CmdViewerWidget(QWidget):
         self.edit_cmd_btn.setIcon(QIcon('icons\\edit.svg'))
         #self.edit_cmd_btn.setDisabled(True)
 
-        self.save_btn = QPushButton('Save')
-        self.save_btn.setDisabled(True)
-        self.save_btn.setIcon(QIcon('icons\\save.svg'))
-
-        self.save_to_btn = QPushButton('Save to..')
-        self.save_to_btn.setIcon(QIcon('icons\\save.svg'))
-
         btn_layout = QGridLayout()
-        btn_layout.addWidget(self.add_cmd_btn, 0, 0)
-        btn_layout.addWidget(self.del_cmd_btn, 1, 0)
-        btn_layout.addWidget(self.edit_cmd_btn, 2, 0)
-        btn_layout.addWidget(self.save_btn, 0, 2)
-        btn_layout.addWidget(self.save_to_btn, 1, 2)
+        btn_layout.addWidget(self.add_cmd_btn, 0, 4)
+        btn_layout.addWidget(self.del_cmd_btn, 0, 5)
+        btn_layout.addWidget(self.edit_cmd_btn, 0, 6)
+        btn_layout.addWidget(QLabel('Command in hex:'), 1, 0)
+        btn_layout.addWidget(self.l_current_cmd, 1, 1, 1, 6)
 
         self.main_layout.addWidget(file_group)
         self.main_layout.addWidget(self.cmdtree)
+        #self.main_layout.addWidget(self.l_current_cmd)
         self.main_layout.addLayout(btn_layout)
 
         self.file_dialog_btn.clicked.connect(self.open_file_dialog)
         self.del_cmd_btn.clicked.connect(self.del_cmd)
         self.edit_cmd_btn.clicked.connect(self.edit_cmd)
-        self.save_btn.clicked.connect(self.save_file_changes)
-        self.save_to_btn.clicked.connect(self.save_to)
+        self.cmdtree.selectionModel().selectionChanged.connect(self.selection_item_changed)
+
+    def selection_item_changed(self, new, old):
+        index = new.indexes()[0]
+        if index.parent().data() is None:
+            item = self.model.item(index.row(), 0)
+            cmd, cmd_num_position = self.get_cmd_current_bytes(item)
+            self.l_current_cmd.setText(bytes_to_hex_string(cmd))
 
     def edit_cmd(self):
         index = self.cmdtree.currentIndex()
@@ -87,7 +89,6 @@ class CmdViewerWidget(QWidget):
             index = index.parent()
         cmd_name = index.data()
         if cmd_name is not None:
-            print({cmd_name: self.cmd_data[cmd_name]})
             self.signal.emit(signal_type('edit_cmd', (cmd_name, self.cmd_data[cmd_name])))
 
     def del_cmd(self):
@@ -117,7 +118,7 @@ class CmdViewerWidget(QWidget):
             self.change_flag = False
 
     def save_to(self):
-        dir_ = QFileDialog.getOpenFileName(None, 'Save File', '', 'CMD file (*.json)')
+        dir_ = QFileDialog.getSaveFileName(None, 'Save File', '', 'CMD file (*.json)')
         if dir_[0] != '':
             file_path = dir_[0]
             with open(file_path, 'w', encoding='utf-8') as fp:
@@ -156,8 +157,8 @@ class CmdViewerWidget(QWidget):
                                    'padding: 4px;')
             btn_send.setFixedWidth(90)
 
-            btn_index = self.model.indexFromItem(send_btn_item)
-            self.cmdtree.setIndexWidget(btn_index, btn_send)
+            cmd_index = self.model.indexFromItem(send_btn_item)
+            self.cmdtree.setIndexWidget(cmd_index, btn_send)
 
             for byte_name, byte_description in cmd.items():
                 byte_name_item = QStandardItem(byte_name)
@@ -172,12 +173,16 @@ class CmdViewerWidget(QWidget):
                         spin.setSingleStep(byte_description['step'])
                         spin.setValue(byte_description['def_value'])
                         self.cmdtree.setIndexWidget(byte_widget_index, spin)
+                        self.mapper.setMapping(spin, str(i))
+                        spin.valueChanged.connect(self.mapper.map)
 
                     elif byte_description['type'] == 'enum':
                         combo = QComboBox()
                         for text_, data_ in byte_description['values'].items():
                             combo.addItem(text_, data_)
                         self.cmdtree.setIndexWidget(byte_widget_index, combo)
+                        self.mapper.setMapping(combo, str(i))
+                        combo.currentIndexChanged.connect(self.mapper.map)
 
                     elif byte_description['type'] == 'const_num':
                         spin = QSpinBox()
@@ -193,6 +198,8 @@ class CmdViewerWidget(QWidget):
                         check = QCheckBox()
                         check.setChecked(byte_description['def_state'])
                         self.cmdtree.setIndexWidget(byte_widget_index, check)
+                        self.mapper.setMapping(check, str(i))
+                        check.stateChanged.connect(self.mapper.map)
 
                     elif byte_description['type'] == 'bit_field':
                         for bit_name, bit_description in byte_description['description'].items():
@@ -208,25 +215,27 @@ class CmdViewerWidget(QWidget):
                                     for text_, data_ in bit_description['values'].items():
                                         combo.addItem(text_, data_)
                                     self.cmdtree.setIndexWidget(bit_widget_index, combo)
+                                    self.mapper.setMapping(combo, str(i))
+                                    combo.currentIndexChanged.connect(self.mapper.map)
 
                                 elif bit_description['type'] == 'bit_bool':
                                     check = QCheckBox()
                                     check.setChecked(bit_description['def_state'])
                                     check.bit_num = bit_description['bit_num']
                                     self.cmdtree.setIndexWidget(bit_widget_index, check)
+                                    self.mapper.setMapping(check, str(i))
+                                    check.stateChanged.connect(self.mapper.map)
 
                                 elif bit_description['type'] == 'bit_num':
                                     pass
 
+        self.mapper.mapped[str].connect(self.dicription_widget_data_changed)
         self.mapper.mapped[int].connect(self.btn_press)
         self.model.setHorizontalHeaderLabels(['Names', 'Values', 'Send buttons'])
         self.cmdtree.setColumnWidth(0, 360)
         self.cmdtree.setColumnWidth(1, 140)
 
-    def btn_press(self, row_num):
-        """ Функция - обработчик нажатия на кнопку Send напротив команты.
-         Составляет команду и отправляет ее сигналом."""
-        command_item = self.model.item(row_num, 0)
+    def get_cmd_current_bytes(self, command_item):
         command = b''
         command_num_position = None
         if command_item.hasChildren():
@@ -260,8 +269,19 @@ class CmdViewerWidget(QWidget):
                         elif type(widget_) == QCheckBox:
                             byte_ = bit_change(byte_, widget_.bit_num, widget_.isChecked())
                     command += byte_.to_bytes(1, 'little', signed=False)
+            return command, command_num_position
 
+    def btn_press(self, row_num):
+        """ Функция - обработчик нажатия на кнопку Send напротив команты.
+         Составляет команду и отправляет ее сигналом."""
+        command_item = self.model.item(row_num, 0)
+        command, command_num_position = self.get_cmd_current_bytes(command_item)
         self.signal_bytes.emit(signal_cmd('send_cmd', command, command_num_position))
+
+    def dicription_widget_data_changed(self, row_num):
+        item = self.model.item(int(row_num)-1, 0)
+        cmd, cmd_num_position = self.get_cmd_current_bytes(item)
+        self.l_current_cmd.setText(bytes_to_hex_string(cmd))
 
     def open_file_dialog(self):
         if self.settings.contains("last_file_path"):
@@ -274,7 +294,6 @@ class CmdViewerWidget(QWidget):
             file_path = dir_[0]
             self.file_path_lable.setText(file_path)
             self.open_file(file_path)
-            self.save_btn.setDisabled(False)
 
     def open_file(self, path):
         with open(path, 'r', encoding='utf-8') as f:
@@ -428,6 +447,13 @@ class CmdCreatorWidget(QWidget):
                         },
                 }
         }
+        self.fill_tree()
+
+    def edit_cmd(self, cmd_name, cmd):
+        self.cmd_name = cmd_name
+        self.cmd = cmd
+        self.te_cmd_name.setText(cmd_name)
+        self.sb_cmd_num.setValue(cmd[cmd_name]['Command num']['def_value'])
         self.fill_tree()
 
     def clear_cmds(self):
@@ -797,7 +823,6 @@ class WidgetNum(QWidget):
         self.sb_step.valueChanged.connect(self.changed_step)
         self.sb_max.valueChanged.connect(self.changed_max)
         self.sb_min.valueChanged.connect(self.changed_min)
-        self.sb_def.valueChanged.connect(self.changed_def)
 
     def __create_widgets(self):
         self.main_layout = QGridLayout()
@@ -807,30 +832,30 @@ class WidgetNum(QWidget):
         self.te_name = QTextEdit('Some numeric name')
         self.te_name.setMaximumHeight(24)
 
-        lable_sb_def = QLabel('Default value: ')
+        lable_sb_def = QLabel('Default: ')
         self.sb_def = QSpinBox()
 
-        lable_sb_min = QLabel('Minimum value: ')
+        lable_sb_min = QLabel('Minimum: ')
         self.sb_min = QSpinBox()
         self.sb_min.setMaximum(0xFFFF)
 
-        lable_sb_max = QLabel('Maximum value: ')
+        lable_sb_max = QLabel('Maximum: ')
         self.sb_max = QSpinBox()
         self.sb_max.setMaximum(0xFFFF)
         self.sb_max.setValue(0xFF)
 
-        lable_sb_step = QLabel('Step value: ')
+        lable_sb_step = QLabel('Step: ')
         self.sb_step = QSpinBox()
         self.sb_step.setMinimum(1)
 
         self.main_layout.addWidget(lable_name, 0, 0)
         self.main_layout.addWidget(self.te_name, 0, 1)
-        self.main_layout.addWidget(lable_sb_def, 1, 0)
-        self.main_layout.addWidget(self.sb_def, 1, 1)
+        self.main_layout.addWidget(lable_sb_max, 1, 0)
+        self.main_layout.addWidget(self.sb_max, 1, 1)
         self.main_layout.addWidget(lable_sb_min, 2, 0)
         self.main_layout.addWidget(self.sb_min, 2, 1)
-        self.main_layout.addWidget(lable_sb_max, 3, 0)
-        self.main_layout.addWidget(self.sb_max, 3, 1)
+        self.main_layout.addWidget(lable_sb_def, 3, 0)
+        self.main_layout.addWidget(self.sb_def, 3, 1)
         self.main_layout.addWidget(lable_sb_step, 4, 0)
         self.main_layout.addWidget(self.sb_step, 4, 1)
 
@@ -842,6 +867,7 @@ class WidgetNum(QWidget):
             self.sb_def.setValue(self.sb_min.value())
         if self.sb_def.value() > self.sb_max.value():
             self.sb_def.setValue(self.sb_max.value())
+        self.sb_def.setMinimum(self.sb_min.value())
 
     def changed_max(self):
         if self.sb_max.value() < (self.sb_min.value() + self.sb_step.value()):
@@ -850,11 +876,11 @@ class WidgetNum(QWidget):
                 self.sb_step.setValue(step)
             else:
                 self.sb_max.setValue(self.sb_min.value() + self.sb_step.value())
-
         if self.sb_def.value() < self.sb_min.value():
             self.sb_def.setValue(self.sb_min.value())
         if self.sb_def.value() > self.sb_max.value():
             self.sb_def.setValue(self.sb_max.value())
+        self.sb_def.setMaximum(self.sb_max.value())
 
     def changed_step(self):
         if self.sb_step.value() > (self.sb_max.value() - self.sb_min.value()):
@@ -864,12 +890,7 @@ class WidgetNum(QWidget):
             self.sb_def.setValue(self.sb_min.value())
         if self.sb_def.value() > self.sb_max.value():
             self.sb_def.setValue(self.sb_max.value())
-
-    def changed_def(self):
-        if self.sb_def.value() < self.sb_min.value():
-            self.sb_def.setValue(self.sb_min.value())
-        if self.sb_def.value() > self.sb_max.value():
-            self.sb_def.setValue(self.sb_max.value())
+        self.sb_def.setSingleStep(self.sb_step.value())
 
     def get_byte_item(self):
         byte_name = self.te_name.toPlainText()
@@ -984,7 +1005,6 @@ class WidgetBitField(QDialog):
                     combo.quantity_bit = bit_description['quantity_bit']
                     for text_, data_ in bit_description['values'].items():
                         combo.addItem(text_, data_)
-                        print(text_, data_)
                     self.cmdtree.setIndexWidget(bit_widget_index, combo)
                 elif bit_description['type'] == 'bit_bool':
                     check = QCheckBox()

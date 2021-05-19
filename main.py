@@ -19,20 +19,26 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.resize(1000, 800)
+        self.setWindowTitle('Com Client Gen3')
 
+        self.file_menu = self.menuBar().addMenu('&File')
         self.view_menu = self.menuBar().addMenu("&View")
+
         self.create_sp()
         self.create_cmd_viewer_docker()
         self.cmd_creator = CmdCreatorWidget()
-        # self.setWindowIcon(QIcon('icons\\command.svg.svg'))
-        self.setWindowTitle('Com Client Gen3')
-        #self.tabifyDockWidget(self.docker_cmd_creator, self.docker_cmd_viewer)
+
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.cmd_creator.signal_cmd.connect(self.cmd_viewer.add_cmd, Qt.QueuedConnection)
         self.cmd_viewer.signal_bytes.connect(self.cmd_signal_byte_handling, Qt.QueuedConnection)
         self.cmd_viewer.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
         self.cmd_viewer.add_cmd_btn.clicked.connect(self.open_cmd_creator)
 
+        self.file_menu.addAction(QIcon('icons\\folder.svg'), 'Open', self.cmd_viewer.open_file_dialog, shortcut='Ctrl+O')
+        self.file_menu.addAction(QIcon('icons\\save.svg'), 'Save', self.cmd_viewer.save_file_changes, shortcut='Ctrl+S')
+        self.file_menu.addAction(QIcon('icons\\save.svg'), 'Save to..', self.cmd_viewer.save_to)
+        self.file_menu.addSeparator()
+        self.file_menu.addAction(QIcon('icons\\x.svg'), 'Exit', self.close, shortcut='Ctrl+Q')
 
     def open_cmd_creator(self):
         self.cmd_creator.show()
@@ -63,9 +69,7 @@ class MainWindow(QMainWindow):
     def cmd_signal_handling(self, signal):
         print(signal.name)
         if signal.name == 'edit_cmd':
-            self.cmd_creator.cmd = dict([signal.value])
-            self.cmd_creator.cmd_name = signal.value[0]
-            self.cmd_creator.fill_tree()
+            self.cmd_creator.edit_cmd(signal.value[0], dict([signal.value]))
             self.cmd_creator.show()
 
     def closeEvent(self, event):
