@@ -138,9 +138,13 @@ class CmdViewerWidget(QWidget):
         for cmd_name, cmd in commands.items():
 
             cmd_name_item = QStandardItem(cmd_name)
-            space = QStandardItem()
+            cmd_num_item = QStandardItem(hex(cmd["Command num"]["def_value"]))
+            _font = cmd_name_item.font()
+            _font.setBold(True)
+            cmd_name_item.setFont(_font)
+            cmd_num_item.setTextAlignment(Qt.AlignCenter)
             send_btn_item = QStandardItem()
-            self.model.appendRow([cmd_name_item, space, send_btn_item])
+            self.model.appendRow([cmd_name_item, cmd_num_item, send_btn_item])
 
             btn_send = QPushButton('Send')
             self.btns_list.append(btn_send)
@@ -300,12 +304,27 @@ class CmdViewerWidget(QWidget):
             self.cmd_data = json.load(f)
             self.fill_tree(self.cmd_data)
             self.settings.setValue('last_file_path', path)
+            self.change_flag = False
 
     def check_changes(self):
+        """
+        Возвращает False в том случае, если пользователь нажал Cancel
+                   True - пользователь нажал Yes или No
+                   True - файл не изменялся
+        """
         if self.change_flag is True:
-            dialog = SaveDialog("You haven't saved changes. Do you want to save?")
-            if dialog.exec_():
+            result = QMessageBox.warning(None, 'Save file ', "You haven't saved changes. Do you want to save?",
+                                         buttons=QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                                         defaultButton=QMessageBox.Cancel)
+            if result == QMessageBox.Yes:
                 self.save_to()
+                return True
+            elif result == QMessageBox.No:
+                return True
+            elif result == QMessageBox.Cancel:
+                return False
+        else:
+            return True
 
 
 class CmdCreatorWidget(QWidget):

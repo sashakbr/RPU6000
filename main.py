@@ -73,8 +73,10 @@ class MainWindow(QMainWindow):
             self.cmd_creator.show()
 
     def closeEvent(self, event):
-        self.cmd_viewer.check_changes()
-        event.accept()
+        if self.cmd_viewer.check_changes():
+            event.accept()
+        else:
+            event.ignore()
 
 
 if __name__ == '__main__':

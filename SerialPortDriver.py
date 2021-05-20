@@ -78,7 +78,6 @@ class SP(QWidget):
         self.cb_parsing = QCheckBox('Parsing')
         self.cb_parsing.setFixedSize(60, 15)
 
-
     def _set_widget_layouts(self):
         self.sp_layout = QVBoxLayout()
         self.setLayout(self.sp_layout)
