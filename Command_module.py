@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import (QComboBox, QLabel, QTextEdit, QListWidget, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget,
                              QPushButton, QSpinBox, QCheckBox, QSlider, QGroupBox, QSpacerItem, QSizePolicy,
                              QMenu, QLCDNumber, QTreeWidget, QTreeWidgetItem, QTreeView, QFileDialog, QStackedWidget,
-                             QListWidgetItem, QMessageBox, QLayoutItem, QFrame, QAbstractItemView)
+                             QListWidgetItem, QMessageBox, QLayoutItem, QFrame, QAbstractItemView, QPlainTextEdit, QTableWidget, QTableWidgetItem)
 from PyQt5.QtCore import pyqtSignal, Qt, QSignalMapper, QSize, QSettings
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon
 from utility import *
@@ -344,7 +344,7 @@ class CmdCreatorWidget(QWidget):
 
         add_layout = QHBoxLayout()
         self.main_layout.addLayout(add_layout)
-        self.te_cmd_name = QTextEdit('Some name')
+        self.te_cmd_name = QPlainTextEdit('Some name')
         self.te_cmd_name.setMaximumHeight(24)
         self.sb_cmd_num = QSpinBox()
         self.sb_cmd_num.setMaximum(0xFF)
@@ -455,18 +455,22 @@ class CmdCreatorWidget(QWidget):
             self.fill_tree()
 
     def create_cmd(self):
-        self.cmd_name = self.te_cmd_name.toPlainText()
-        self.cmd = {
-            self.cmd_name:
-                {
-                    'Command num':
-                        {
-                            'type': 'const_num',
-                            'def_value': self.sb_cmd_num.value(),
-                        },
-                }
-        }
-        self.fill_tree()
+        cmd_name = self.te_cmd_name.toPlainText()
+        if cmd_name != '':
+            self.cmd_name = cmd_name
+            self.cmd = {
+                self.cmd_name:
+                    {
+                        'Command num':
+                            {
+                                'type': 'const_num',
+                                'def_value': self.sb_cmd_num.value(),
+                            },
+                    }
+            }
+            self.fill_tree()
+        else:
+            QMessageBox.warning(None, 'Info ', "Command name cannot be empty!", buttons=QMessageBox.Ok)
 
     def edit_cmd(self, cmd_name, cmd):
         self.cmd_name = cmd_name
