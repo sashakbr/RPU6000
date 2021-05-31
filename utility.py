@@ -9,6 +9,7 @@ from PyQt5.QtGui import QFont
 
 signal_type = namedtuple('Signal', ['name', 'value'])
 signal_cmd = namedtuple('CMD', ['name', 'value', 'position'])
+signal_info = namedtuple('info', ['text', 'font'])
 
 class CustomDialog(QDialog):
     def __init__(self, text: str, parent=None):
@@ -145,6 +146,18 @@ def cmd_parser(cmd: bytes, protocol: dict, command_num_position: int):
             return 'Unknown command!'
     else:
         return 'No response from device!'
+
+def cmd_parser2(cmd: bytes, protocol: dict, cmd_num_position: int):
+    if len(cmd) != 0:
+        cmd_num = cmd[cmd_num_position]
+        res_str = ''
+        for cmd_name, cmd_body in protocol.items():
+            if cmd_num == cmd_body['Command num']['def_value']:
+                if cmd_num_position != 0:
+                    print(list(cmd_body.items())[0])
+                else:
+                    pass
+        return res_str
 
 
 if __name__ == '__main__':

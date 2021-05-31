@@ -13,6 +13,7 @@ import copy
 class CmdViewerWidget(QWidget):
     signal = pyqtSignal(signal_type)
     signal_bytes = pyqtSignal(signal_cmd)
+    signal_info = pyqtSignal(signal_info)
 
     def __init__(self):
         super().__init__()
@@ -29,7 +30,9 @@ class CmdViewerWidget(QWidget):
         self.setLayout(self.main_layout)
 
         self.cmdtree = QTreeView()
+        self.cmdtree.setSortingEnabled(True)
         self.model = QStandardItemModel()
+        self.model.setSortRole(5)
         self.cmdtree.setModel(self.model)
         self.mapper = QSignalMapper()
 
@@ -37,7 +40,7 @@ class CmdViewerWidget(QWidget):
         self.file_path_lable = QLabel()
         self.file_dialog_btn = QPushButton('Open')
         self.file_dialog_btn.setShortcut('Ctrl+O')
-        self.file_dialog_btn.setToolTip('<b>Open</b> command file .json')
+        self.file_dialog_btn.setToolTip('Open command file (*.json)')
         self.file_dialog_btn.setFixedSize(60, 30)
         self.file_dialog_btn.setIcon(QIcon('icons\\folder.svg'))
         file_layout = QHBoxLayout()
@@ -48,6 +51,7 @@ class CmdViewerWidget(QWidget):
         file_group.setLayout(file_layout)
 
         self.l_current_cmd = QLabel()
+        self.l_current_cmd.setFont(QFont('Consolas', 9))
 
         self.del_cmd_btn = QPushButton('Delete')
         self.del_cmd_btn.setIcon(QIcon('icons\\delete.svg'))
@@ -57,14 +61,19 @@ class CmdViewerWidget(QWidget):
 
         self.edit_cmd_btn = QPushButton('Edit')
         self.edit_cmd_btn.setIcon(QIcon('icons\\edit.svg'))
-        #self.edit_cmd_btn.setDisabled(True)
+
+        self.sort_cmd_btn = QPushButton('Sort')
+        self.sort_cmd_btn.setIcon(QIcon('icons\\sort.svg'))
+
+        self.collapse_all_btn = QPushButton('Collapse all')
 
         btn_layout = QGridLayout()
-        btn_layout.addWidget(self.add_cmd_btn, 0, 4)
-        btn_layout.addWidget(self.del_cmd_btn, 0, 5)
-        btn_layout.addWidget(self.edit_cmd_btn, 0, 6)
-        btn_layout.addWidget(QLabel('Command in hex:'), 1, 0)
-        btn_layout.addWidget(self.l_current_cmd, 1, 1, 1, 6)
+        btn_layout.addWidget(self.collapse_all_btn, 0, 5)
+        btn_layout.addWidget(self.sort_cmd_btn, 0, 6)
+        btn_layout.addWidget(self.add_cmd_btn, 0, 7)
+        btn_layout.addWidget(self.del_cmd_btn, 0, 8)
+        btn_layout.addWidget(self.edit_cmd_btn, 0, 9)
+        btn_layout.addWidget(self.l_current_cmd, 0, 0, 1, 5)
 
         self.main_layout.addWidget(file_group)
         self.main_layout.addWidget(self.cmdtree)
@@ -75,13 +84,15 @@ class CmdViewerWidget(QWidget):
         self.del_cmd_btn.clicked.connect(self.del_cmd)
         self.edit_cmd_btn.clicked.connect(self.edit_cmd)
         self.cmdtree.selectionModel().selectionChanged.connect(self.selection_item_changed)
+        self.sort_cmd_btn.clicked.connect(self.sort_cmds)
+        self.collapse_all_btn.clicked.connect(self.cmdtree.collapseAll)
 
     def selection_item_changed(self, new, old):
         index = new.indexes()[0]
         if index.parent().data() is None:
             item = self.model.item(index.row(), 0)
             cmd, cmd_num_position = self.get_cmd_current_bytes(item)
-            self.l_current_cmd.setText(bytes_to_hex_string(cmd))
+            self.signal_info.emit(signal_info('Hex: ' + bytes_to_hex_string(cmd), QFont('Consolas', 9)))
 
     def edit_cmd(self):
         index = self.cmdtree.currentIndex()
@@ -110,12 +121,19 @@ class CmdViewerWidget(QWidget):
         self.fill_tree(self.cmd_data)
         self.change_flag = True
 
+    def sort_cmds(self):
+        if self.cmd_data is not None:
+            self.cmd_data = dict(sorted(self.cmd_data.items()))
+            #self.change_flag = True
+            self.fill_tree(self.cmd_data)
+
     def save_file_changes(self):
         file_path = self.file_path_lable.text()
         if file_path != '':
             with open(file_path, 'w', encoding='utf-8') as fp:
                 json.dump(self.cmd_data, fp, sort_keys=False, indent=4, ensure_ascii=False)
             self.change_flag = False
+            self.signal_info.emit(f'Saved: {file_path}', None)
 
     def save_to(self):
         dir_ = QFileDialog.getSaveFileName(None, 'Save File', '', 'CMD file (*.json)')
@@ -124,6 +142,8 @@ class CmdViewerWidget(QWidget):
             with open(file_path, 'w', encoding='utf-8') as fp:
                 json.dump(self.cmd_data, fp, sort_keys=False, indent=4, ensure_ascii=False)
             self.change_flag = False
+            self.signal_info.emit(signal_info(f'Saved to: {file_path}', None))
+            self.file_path_lable.setText(file_path)
 
     def clear_tree(self):
         """ Очистка модели дерева """
@@ -285,7 +305,7 @@ class CmdViewerWidget(QWidget):
     def dicription_widget_data_changed(self, row_num):
         item = self.model.item(int(row_num)-1, 0)
         cmd, cmd_num_position = self.get_cmd_current_bytes(item)
-        self.l_current_cmd.setText(bytes_to_hex_string(cmd))
+        self.signal_info.emit(signal_info('Hex: ' + bytes_to_hex_string(cmd), QFont('Consolas', 9)))
 
     def open_file_dialog(self):
         if self.settings.contains("last_file_path"):
@@ -305,6 +325,7 @@ class CmdViewerWidget(QWidget):
             self.fill_tree(self.cmd_data)
             self.settings.setValue('last_file_path', path)
             self.change_flag = False
+            self.signal_info.emit(signal_info(f'Opened {path}', None))
 
     def check_changes(self):
         """
@@ -344,7 +365,7 @@ class CmdCreatorWidget(QWidget):
 
         add_layout = QHBoxLayout()
         self.main_layout.addLayout(add_layout)
-        self.te_cmd_name = QPlainTextEdit('Some name')
+        self.te_cmd_name = QTextEdit('Some name')
         self.te_cmd_name.setMaximumHeight(24)
         self.sb_cmd_num = QSpinBox()
         self.sb_cmd_num.setMaximum(0xFF)

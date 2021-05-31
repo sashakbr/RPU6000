@@ -19,6 +19,7 @@ def get_available_ports():
 
 class SP(QWidget):
     signal = pyqtSignal(signal_type)
+    signal_info = pyqtSignal(signal_info)
 
     def __init__(self):
         super().__init__()
@@ -34,7 +35,9 @@ class SP(QWidget):
         self.update_baudrate()
 
     def _create_widgets(self):
-        self.setFixedWidth(370)
+        #self.setFixedWidth(370)
+        self.setBaseSize(360, self.baseSize().height())
+        self.setMinimumWidth(300)
         self.l_PortName = QLabel("Name")
         self.cb_PortName = QComboBox()
         self.cb_PortName.setFixedSize(80, 22)
@@ -70,7 +73,7 @@ class SP(QWidget):
         # история отправленных  и принятых команд команд
         self.te_log = QTextEdit()
         self.te_log.setReadOnly(True)
-        self.te_log.setFont(QFont('Courier New', 9))
+        self.te_log.setFont(QFont('Consolas', 9))
         # кнопка очистки лога
         self.clear_btn = QPushButton('Clear')
         self.clear_btn.setIcon(QIcon('icons\\trash.svg'))
@@ -112,6 +115,7 @@ class SP(QWidget):
         layout4 = QHBoxLayout()
         self.sp_layout.addLayout(layout4)
         layout4.addWidget(self.cb_parsing)
+        layout4.addStretch(1)
         layout4.addWidget(self.clear_btn)
 
     def _create_settings_widget(self):
@@ -163,6 +167,7 @@ class SP(QWidget):
             self.pb_connect.setText('Open')
             self.cb_PortName.setDisabled(False)
             self.log_info(f'Serial port {portName} is close!', 'orange')
+            self.signal_info.emit(signal_info(f'Port {portName} is close', None))
         else:
             state = self.open_port(portName)
             if state:
@@ -171,12 +176,14 @@ class SP(QWidget):
                 self.pb_connect.setText('Close')
                 self.cb_PortName.setDisabled(True)
                 self.log_info(f'Serial port {portName} is open!', 'green')
+                self.signal_info.emit(signal_info(f'Port {portName} is open', None))
             else:
                 self.signal.emit(signal_type('sp state', 'opening failed'))
                 self.pb_con_state.setStyleSheet("background-color: grey")
                 self.pb_connect.setText('Open')
                 self.cb_PortName.setDisabled(False)
                 self.log_info(f'Serial port {portName} opening failed!', 'red')
+                self.signal_info.emit(signal_info(f'Could not open {portName} port', None))
 
     def update_baudrate(self):
         self.connection.baudrate = self.cb_BaudRate.currentData()
@@ -207,7 +214,6 @@ class SP(QWidget):
                 self.connection.open()
                 return True
             except Exception:
-                self.log_info("Could not open port " + port_name, 'red')
                 return False
         else:
             return True
@@ -229,6 +235,7 @@ class SP(QWidget):
         if self.connection.isOpen():
             self.connection.write(tx_data)
             rx_data = self.connection.read(rx_data_len)
+            self.connection.reset_input_buffer()
             self.log_cmd(tx_data, rx_data)
             return rx_data
         else:

@@ -1,6 +1,6 @@
 import sys
 import os
-from PyQt5.QtWidgets import QApplication, QMainWindow, QDockWidget, QStyleFactory
+from PyQt5.QtWidgets import QApplication, QMainWindow, QDockWidget, QStyleFactory, QStatusBar
 from PyQt5.QtCore import Qt, pyqtSignal
 import time
 
@@ -20,6 +20,13 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.resize(1000, 800)
         self.setWindowTitle('Com Client Gen3')
+        self.status_bar = QStatusBar()
+        self.setStatusBar(self.status_bar)
+
+        self.status_lable = QLabel('hello')
+        self.status_bar_layout = QHBoxLayout()
+        self.status_bar.setLayout(self.status_bar_layout)
+        self.status_bar_layout.addWidget(self.status_lable)
 
         self.file_menu = self.menuBar().addMenu('&File')
         self.view_menu = self.menuBar().addMenu("&View")
@@ -29,10 +36,12 @@ class MainWindow(QMainWindow):
         self.cmd_creator = CmdCreatorWidget()
 
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
+        self.sp.signal_info.connect(self.show_info, Qt.QueuedConnection)
         self.cmd_creator.signal_cmd.connect(self.cmd_viewer.add_cmd, Qt.QueuedConnection)
         self.cmd_viewer.signal_bytes.connect(self.cmd_signal_byte_handling, Qt.QueuedConnection)
         self.cmd_viewer.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
         self.cmd_viewer.add_cmd_btn.clicked.connect(self.open_cmd_creator)
+        self.cmd_viewer.signal_info.connect(self.show_info, Qt.QueuedConnection)
 
         self.file_menu.addAction(QIcon('icons\\folder.svg'), 'Open', self.cmd_viewer.open_file_dialog, shortcut='Ctrl+O')
         self.file_menu.addAction(QIcon('icons\\save.svg'), 'Save', self.cmd_viewer.save_file_changes, shortcut='Ctrl+S')
@@ -64,13 +73,22 @@ class MainWindow(QMainWindow):
             read_cmd = self.sp.write_read(signal.value, len(signal.value))
             if self.sp.cb_parsing.isChecked():
                 self.sp.log_info(
-                    cmd_parser(read_cmd, self.cmd_viewer.cmd_data, command_num_position=signal.position), 'black')
+                    cmd_parser(signal.value, self.cmd_viewer.cmd_data, command_num_position=signal.position), 'black')
+                self.sp.log_info(
+                    cmd_parser2(signal.value, self.cmd_viewer.cmd_data, cmd_num_position=signal.position), 'red')
 
     def cmd_signal_handling(self, signal):
         print(signal.name)
         if signal.name == 'edit_cmd':
             self.cmd_creator.edit_cmd(signal.value[0], dict([signal.value]))
             self.cmd_creator.show()
+
+    def show_info(self, signal: signal_info):
+        if signal.font is None:
+            self.status_bar.setFont(self.font())
+        else:
+            self.status_bar.setFont(signal.font)
+        self.status_bar.showMessage(signal.text, 8000)
 
     def closeEvent(self, event):
         if self.cmd_viewer.check_changes():
