@@ -4,9 +4,10 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QDockWidget, QStyleFactor
 from PyQt5.QtCore import Qt, pyqtSignal
 import time
 
-import SerialPortDriver
+import SerialPortDriver2
 from Command_module import *
 from utility import *
+import new
 
 from loguru import logger
 
@@ -34,6 +35,7 @@ class MainWindow(QMainWindow):
         self.create_sp()
         self.create_cmd_viewer_docker()
         self.cmd_creator = CmdCreatorWidget()
+        self.create_monitor_docker()
 
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.sp.signal_info.connect(self.show_info, Qt.QueuedConnection)
@@ -54,7 +56,7 @@ class MainWindow(QMainWindow):
         self.cmd_creator.resize(600, 600)
 
     def create_sp(self):
-        self.sp = SerialPortDriver.SP()
+        self.sp = SerialPortDriver2.SP2()
         self.setCentralWidget(self.sp)
 
     def create_cmd_viewer_docker(self):
@@ -64,18 +66,20 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.docker_cmd_viewer)
         self.view_menu.addAction(self.docker_cmd_viewer.toggleViewAction())
 
+    def create_monitor_docker(self):
+        self.monitor = new.Monitor()
+        self.docker_monitor = QDockWidget('Monitor', self)
+        self.docker_monitor.setWidget(self.monitor)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.docker_monitor)
+        self.view_menu.addAction(self.docker_monitor.toggleViewAction())
+
     def sp_signal_handling(self, signal):
         if signal.name == 'cmd':
             print(self.cmd_viewer.cmdtree.currentIndex().row())
 
     def cmd_signal_byte_handling(self, signal):
         if signal.name == 'send_cmd':
-            read_cmd = self.sp.write_read(signal.value, len(signal.value))
-            if self.sp.cb_parsing.isChecked():
-                self.sp.log_info(
-                    cmd_parser(signal.value, self.cmd_viewer.cmd_data, command_num_position=signal.position), 'black')
-                self.sp.log_info(
-                    cmd_parser2(signal.value, self.cmd_viewer.cmd_data, cmd_num_position=signal.position), 'red')
+            self.sp.write(signal.value)
 
     def cmd_signal_handling(self, signal):
         print(signal.name)

@@ -1,14 +1,15 @@
 from PyQt5.QtSerialPort import QSerialPortInfo
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt
 from PyQt5.QtGui import QIcon, QColor, QFont
-from PyQt5.QtWidgets import QWidget, QLabel, QComboBox, QPushButton, QTextEdit,\
-                            QHBoxLayout, QVBoxLayout, QSpacerItem, QGroupBox, QSizePolicy,\
-                            QApplication, QDialog, QDialogButtonBox, QCheckBox
+from PyQt5.QtWidgets import QWidget, QLabel, QComboBox, QPushButton, QTextEdit, \
+    QHBoxLayout, QVBoxLayout, QSpacerItem, QGroupBox, QSizePolicy, \
+    QApplication, QDialog, QDialogButtonBox, QCheckBox
 import serial
 from utility import *
 from SP_settings import *
 import tread_test
 import queue
+from datetime import datetime
 
 
 def get_available_ports():
@@ -19,32 +20,23 @@ def get_available_ports():
     return portsName
 
 
-class SP(QWidget):
+class SP2(QWidget):
     signal = pyqtSignal(signal_type)
     signal_info = pyqtSignal(signal_info)
 
     def __init__(self):
         super().__init__()
-        self.connection = serial.Serial(parity=serial.PARITY_NONE,
-                                        stopbits=serial.STOPBITS_ONE,
-                                        bytesize=serial.EIGHTBITS,
-                                        timeout=0.05,
-                                        xonxoff=False)
+        self.queue = queue.Queue()
+        self.connection = tread_test.SerialTread(self.queue)
         self._create_widgets()
         self._set_widget_layouts()
         self._set_events()
         self._create_settings_widget()
-        self.update_baudrate()
-        self.timer_ = 0
 
-
-    def timerEvent(self, event):
-        if self.connection.isOpen() and self.connection.inWaiting() != 0:
-            data = self.connection.readall()
-            rx_str = bytes_to_hex_string(data)
-            self.te_log.setTextColor(QColor('blue'))
-            self.te_log.append(f'RX--> hex: {rx_str}')
-            self.te_log.append('')
+        self.connection.closed_signal.connect(self.connection_is_closed)
+        self.connection.opened_signal.connect(self.connection_is_open)
+        self.connection.fail_signal.connect(self.connection_is_fail)
+        self.connection.parcel_signal.connect(self.log_parcel)
 
     def _create_widgets(self):
         #self.setFixedWidth(370)
@@ -92,6 +84,7 @@ class SP(QWidget):
         # галочка включения парсинга принятой команды согласно команд в дереве
         self.cb_parsing = QCheckBox('Parsing')
         self.cb_parsing.setFixedSize(60, 15)
+        self.cb_parsing.setDisabled(True)
 
     def _set_widget_layouts(self):
         self.sp_layout = QVBoxLayout()
@@ -130,6 +123,12 @@ class SP(QWidget):
         layout4.addStretch(1)
         layout4.addWidget(self.clear_btn)
 
+    def _set_events(self):
+        self.pb_connect.clicked.connect(self.event_connect)
+        self.clear_btn.clicked.connect(lambda: self.te_log.clear())
+        self.update_port_name_btn.clicked.connect(self.event_update_ports_name)
+        self.pb_settings.clicked.connect(self.event_settings)
+
     def _create_settings_widget(self):
         self.settings_ui = Ui_Dialog()
         self.settings_dialog = QDialog()
@@ -149,59 +148,32 @@ class SP(QWidget):
         self.settings_ui.cb_parity.addItem('EVEN', serial.PARITY_EVEN)
         self.settings_ui.cb_parity.addItem('NAMES', serial.PARITY_NAMES)
 
-        self.settings_ui.buttonBox.button(QDialogButtonBox.Ok).clicked.connect(self.set_settings)
+        self.settings_ui.buttonBox.button(QDialogButtonBox.Ok).clicked.connect(self.set_connection_settings)
         self.settings_ui.buttonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.settings_dialog.close)
 
-    def set_settings(self):
-        self.connection.timeout = self.settings_ui.dsb_timeout.value()
-        self.connection.parity = self.settings_ui.cb_parity.currentData()
-        self.connection.stopbits = self.settings_ui.cb_stopbits.currentData()
-        self.connection.bytesize = self.settings_ui.cb_bytesize.currentData()
+    @pyqtSlot()
+    def set_connection_settings(self):
+        self.connection.set_timeout(self.settings_ui.dsb_timeout.value())
+        self.connection.set_parity(self.settings_ui.cb_parity.currentData())
+        self.connection.set_stopbits(self.settings_ui.cb_stopbits.currentData())
+        self.connection.set_bytesize(self.settings_ui.cb_bytesize.currentData())
         self.settings_dialog.close()
 
-    def _set_events(self):
-        self.pb_connect.clicked.connect(self.event_connect)
-        self.clear_btn.clicked.connect(lambda: self.te_log.clear())
-        self.update_port_name_btn.clicked.connect(self.event_update_ports_name)
-        self.pb_settings.clicked.connect(self.event_settings)
-        self.cb_BaudRate.currentIndexChanged.connect(self.update_baudrate)
-
+    @pyqtSlot()
     def event_settings(self):
         self.settings_dialog.show()
         self.settings_dialog.exec()
 
+    @pyqtSlot()
     def event_connect(self):
-        portName = self.cb_PortName.currentText()
-        if self.connection.isOpen():
-            self.killTimer(self.timer_)
-            self.close_port()
-            self.signal.emit(signal_type('sp state', 'closed'))
-            self.pb_con_state.setStyleSheet("background-color: grey")
-            self.pb_connect.setText('Open')
-            self.cb_PortName.setDisabled(False)
-            self.log_info(f'Serial port {portName} is close!', 'orange')
-            self.signal_info.emit(signal_info(f'Port {portName} is close', None))
+        if self.connection.is_open():
+            self.queue.put(tread_test.event_('close_port', None))
         else:
-            state = self.open_port(portName)
-            if state:
-                self.signal.emit(signal_type('sp state', 'opened'))
-                self.timer_ = self.startTimer(100, timerType=Qt.VeryCoarseTimer)
-                self.pb_con_state.setStyleSheet("background-color: green")
-                self.pb_connect.setText('Close')
-                self.cb_PortName.setDisabled(True)
-                self.log_info(f'Serial port {portName} is open!', 'green')
-                self.signal_info.emit(signal_info(f'Port {portName} is open', None))
-            else:
-                self.signal.emit(signal_type('sp state', 'opening failed'))
-                self.pb_con_state.setStyleSheet("background-color: grey")
-                self.pb_connect.setText('Open')
-                self.cb_PortName.setDisabled(False)
-                self.log_info(f'Serial port {portName} opening failed!', 'red')
-                self.signal_info.emit(signal_info(f'Could not open {portName} port', None))
+            self.connection.set_baudrate(self.cb_BaudRate.currentData())
+            self.set_connection_settings()
+            self.connection.open(self.cb_PortName.currentText())
 
-    def update_baudrate(self):
-        self.connection.baudrate = self.cb_BaudRate.currentData()
-
+    @pyqtSlot()
     def event_update_ports_name(self):
         self.cb_PortName.clear()
         for i in get_available_ports():
@@ -212,55 +184,62 @@ class SP(QWidget):
         self.te_log.append(text)
         self.te_log.append("")
 
-    def log_tx(self, tx: bytes):
-        self.te_log.setTextColor(QColor('blue'))
-        tx_str = bytes_to_hex_string(tx)
-        self.te_log.append(f'TX--> hex: {tx_str}')
+    @pyqtSlot(datetime)
+    def connection_is_closed(self, time):
+        str_time = (time.strftime('%H:%M:%S.%f')[:-3])
+        self.log_info(f'{str_time}  Port {self.cb_PortName.currentText()} is closed!', color='darkGreen')
+        self.signal_info.emit(signal_info(f'Port {self.cb_PortName.currentText()} is closed.', None))
+        self.pb_connect.setText('Open')
+        self.pb_con_state.setStyleSheet("background-color: grey")
+        self.cb_BaudRate.setDisabled(False)
+        self.cb_PortName.setDisabled(False)
+        self.pb_settings.setDisabled(False)
 
-    def log_rx(self, rx: bytes):
-        self.te_log.setTextColor(QColor('blue'))
-        rx_str = bytes_to_hex_string(rx)
-        self.te_log.append(f'RX<-- hex: {rx_str}')
+    @pyqtSlot(datetime)
+    def connection_is_open(self, time):
+        str_time = (time.strftime('%H:%M:%S.%f')[:-3])
+        self.log_info(f'{str_time}  Port {self.cb_PortName.currentText()} is open!', color='green')
+        self.signal_info.emit(signal_info(f'Port {self.cb_PortName.currentText()} is opened.', None))
+        self.pb_connect.setText('Close')
+        self.pb_con_state.setStyleSheet("background-color: green")
+        self.cb_BaudRate.setDisabled(True)
+        self.cb_PortName.setDisabled(True)
+        self.pb_settings.setDisabled(True)
 
-    def log_cmd(self, tx, rx):
-        self.te_log.setTextColor(QColor('blue'))
-        tx_str = bytes_to_hex_string(tx)
-        rx_str = bytes_to_hex_string(rx)
-        self.te_log.append(f'TX--> hex: {tx_str}')
-        self.te_log.append(f'RX--> hex: {rx_str}')
-        self.te_log.append('')
+    @pyqtSlot(tread_test.fail)
+    def connection_is_fail(self, fail: tread_test.fail):
+        str_time = (fail.time.strftime('%H:%M:%S.%f')[:-3])
+        self.log_info(f'{str_time}  {fail.text}', color='red')
 
-    #******************************************************
-    def open_port(self, port_name):
-        if not self.connection.isOpen():
-            try:
-                self.connection.setPort(port_name)
-                self.connection.open()
-                return True
-            except Exception:
-                return False
-        else:
-            return True
+    @pyqtSlot(tread_test.parcel)
+    def log_parcel(self, parcel: tread_test.parcel):
+        str_time = (parcel.time.strftime('%H:%M:%S.%f')[:-3])
 
-    def close_port(self):
-        if self.connection.isOpen():
-            self.connection.close()
+        if parcel.type == 'TX':
+            self.te_log.setTextColor(QColor('blue'))
+            self.te_log.append(f'{str_time}  TX --> hex: {bytes_to_hex_string(parcel.data)}')
+        elif parcel.type == 'RX':
+            self.signal.emit(signal_type('read data', parcel.data))
+            self.te_log.setTextColor(QColor('magenta'))
+            self.te_log.append(f'{str_time}  RX <-- hex: {bytes_to_hex_string(parcel.data)}')
 
-    def write(self, data):
-        self.connection.write(data)
-
-    def read(self, len_data):
-        return self.connection.read(len_data)
-
-    def read_line(self):
-        return self.connection.readline()
-
-    def write_read(self, tx_data: bytes, rx_data_len):
-        if self.connection.isOpen():
-            self.connection.write(tx_data)
-            rx_data = self.connection.read(rx_data_len)
-            #self.connection.reset_input_buffer()
-            self.log_cmd(tx_data, rx_data)
-            return rx_data
+    def write_read(self, tx_data: bytes):
+        if self.connection.is_open():
+            return self.connection.write_read(tx_data)
         else:
             self.log_info('Serial port is not open!', 'red')
+
+    def write(self, tx_data: bytes):
+        if self.connection.is_open():
+            #self.connection.write(tx_data)
+            self.queue.put(tread_test.event_('write', tx_data))  # правильнее работать с очередью
+        else:
+            self.log_info('Serial port is not open!', 'red')
+
+if __name__ == '__main__':
+    import sys
+    app = QApplication(sys.argv)
+    app.setStyle('Fusion')
+    window = SP2()
+    window.show()
+    sys.exit(app.exec_())

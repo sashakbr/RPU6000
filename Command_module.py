@@ -31,6 +31,10 @@ class CmdViewerWidget(QWidget):
 
         self.cmdtree = QTreeView()
         self.cmdtree.setSortingEnabled(True)
+        self.cmdtree.setMinimumWidth(594)
+        #self.cmdtree.setDragEnabled(True)
+        #self.cmdtree.setDragDropMode(QAbstractItemView.InternalMove)
+        #self.cmdtree.dropEvent = self.dropEvent_
         self.model = QStandardItemModel()
         self.model.setSortRole(5)
         self.cmdtree.setModel(self.model)
@@ -66,14 +70,16 @@ class CmdViewerWidget(QWidget):
         self.sort_cmd_btn.setIcon(QIcon('icons\\sort.svg'))
 
         self.collapse_all_btn = QPushButton('Collapse all')
+        self.expand_all_btn = QPushButton('Expand all')
 
-        btn_layout = QGridLayout()
-        btn_layout.addWidget(self.collapse_all_btn, 0, 5)
-        btn_layout.addWidget(self.sort_cmd_btn, 0, 6)
-        btn_layout.addWidget(self.add_cmd_btn, 0, 7)
-        btn_layout.addWidget(self.del_cmd_btn, 0, 8)
-        btn_layout.addWidget(self.edit_cmd_btn, 0, 9)
-        btn_layout.addWidget(self.l_current_cmd, 0, 0, 1, 5)
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(self.expand_all_btn)
+        btn_layout.addWidget(self.collapse_all_btn)
+        btn_layout.addWidget(self.sort_cmd_btn)
+        btn_layout.addStretch(1)
+        btn_layout.addWidget(self.add_cmd_btn)
+        btn_layout.addWidget(self.del_cmd_btn)
+        btn_layout.addWidget(self.edit_cmd_btn)
 
         self.main_layout.addWidget(file_group)
         self.main_layout.addWidget(self.cmdtree)
@@ -86,6 +92,7 @@ class CmdViewerWidget(QWidget):
         self.cmdtree.selectionModel().selectionChanged.connect(self.selection_item_changed)
         self.sort_cmd_btn.clicked.connect(self.sort_cmds)
         self.collapse_all_btn.clicked.connect(self.cmdtree.collapseAll)
+        self.expand_all_btn.clicked.connect(lambda: self.cmdtree.expandToDepth(1))
 
     def selection_item_changed(self, new, old):
         index = new.indexes()[0]
@@ -171,10 +178,10 @@ class CmdViewerWidget(QWidget):
             self.mapper.setMapping(btn_send, i)
             i += 1
             btn_send.clicked.connect(self.mapper.map)
-            btn_send.setStyleSheet('background-color: grey;'
+            btn_send.setStyleSheet('background-color: darkGrey;'
                                    'border-style: outset;'
-                                   'order-width: 2px;'
-                                   'border-radius: 7px;'
+                                   'border-width: 1px;'
+                                   'border-radius: 5px;'
                                    'border-color: beige;'
                                    'font: bold 12px;'
                                    'color: white;'
@@ -256,8 +263,8 @@ class CmdViewerWidget(QWidget):
         self.mapper.mapped[str].connect(self.dicription_widget_data_changed)
         self.mapper.mapped[int].connect(self.btn_press)
         self.model.setHorizontalHeaderLabels(['Names', 'Values', 'Send buttons'])
-        self.cmdtree.setColumnWidth(0, 360)
-        self.cmdtree.setColumnWidth(1, 140)
+        self.cmdtree.setColumnWidth(0, 390)
+        self.cmdtree.setColumnWidth(1, 110)
 
     def get_cmd_current_bytes(self, command_item):
         command = b''
@@ -1061,3 +1068,4 @@ class WidgetBitField(QDialog):
 
     def get_byte_item(self):
         return self.byte_
+
