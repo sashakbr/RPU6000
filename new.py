@@ -21,6 +21,26 @@ class Preselector(QtCore.QObject):
         QtCore.QObject.__init__(self)
         self.band = 0
         self.mode = PreamplifierMode.Filters
+        self.filters = QtWidgets.QComboBox()
+        self.filters.addItems()
+
+
+class Filters(QtWidgets.QComboBox):
+    def __init__(self, items: dict):
+        QtWidgets.QComboBox.__init__(self)
+        self._items = items
+
+    def __set_items(self):
+        for name, data in self._items.items():
+            self.addItem(name, data)
+
+    def set_current_item(self, data):
+        self.blockSignals(True)
+        self.setCurrentText(self._items[data])
+        self.blockSignals(False)
+
+    def get_current_item(self):
+        return self.currentData()
 
 
 class PreamplifierMode(Enum):
