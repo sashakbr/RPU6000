@@ -37,29 +37,64 @@ class Filters(QtWidgets.QComboBox):
         return self.currentData()
 
 
-class Gain(QtWidgets.QSlider):
-    def __init__(self):
-        QtWidgets.QSlider.__init__(self, orientation=QtCore.Qt.Horizontal)
-        self.setMaximum(31)
-        self.setMinimum(0)
+class Gain(QtWidgets.QWidget):
+    value_changed = QtCore.pyqtSignal(int)
+
+    def __init__(self, min_=0, max_=31, step=1):
+        QtWidgets.QWidget.__init__(self)
+        self.slider = QtWidgets.QSlider(orientation=QtCore.Qt.Horizontal)
+        self.spinbox = QtWidgets.QSpinBox()
+        self.set_minimum(min_)
+        self.set_maximum(max_)
+        self.set_step(step)
+
+        layout = QtWidgets.QHBoxLayout()
+        self.setLayout(layout)
+        layout.addWidget(self.slider)
+        layout.addWidget(self.spinbox)
+        self.setMinimumWidth(120)
+
+        self.slider.valueChanged.connect(self.__valueChangedHandel)
+        self.spinbox.valueChanged.connect(self.__valueChangedHandel)
+
+    def __valueChangedHandel(self, value):
+        self.set_value(value)
+        self.value_changed.emit(value)
+
+    def set_maximum(self, value: int):
+        self.slider.setMaximum(value)
+        self.spinbox.setMaximum(value)
+
+    def set_minimum(self, value: int):
+        self.slider.setMinimum(value)
+        self.spinbox.setMinimum(value)
+
+    def set_step(self, value):
+        self.slider.setSingleStep(value)
+        self.spinbox.setSingleStep(value)
 
     def get_value(self):
-        return self.value()
+        return self.spinbox.value()
 
     def set_value(self, value: int):
-        self.blockSignals(True)
-        self.setValue(value)
-        self.blockSignals(False)
+        self.slider.blockSignals(True)
+        self.spinbox.blockSignals(True)
+        self.slider.setValue(value)
+        self.spinbox.setValue(value)
+        self.slider.blockSignals(False)
+        self.spinbox.blockSignals(False)
 
 
 class Preamplifier(QtWidgets.QGroupBox):
     def __init__(self):
         QtWidgets.QGroupBox.__init__(self, 'Preamplifier')
-        self.filters = Filters(PreamplifierFilters)
-        self.gain = Gain()
-
         self.main_layout = QtWidgets.QGridLayout()
         self.setLayout(self.main_layout)
+
+        self.filters = Filters(PreamplifierFilters)
+        self.gain = Gain()
+        # self.gain.value_changed.connect(lambda value: print(value))
+
         self.main_layout.addWidget(QtWidgets.QLabel('Input'), 0, 0)
         self.main_layout.addWidget(self.filters, 0, 1)
         self.main_layout.addWidget(QtWidgets.QLabel('Gain'))
@@ -69,11 +104,12 @@ class Preamplifier(QtWidgets.QGroupBox):
 class BpfBlock(QtWidgets.QGroupBox):
     def __init__(self):
         QtWidgets.QGroupBox.__init__(self, 'Bandpass filters block')
+        self.main_layout = QtWidgets.QGridLayout()
+        self.setLayout(self.main_layout)
+
         self.filters = Filters(PreamplifierFilters)
         self.gain = Gain()
 
-        self.main_layout = QtWidgets.QGridLayout()
-        self.setLayout(self.main_layout)
         self.main_layout.addWidget(QtWidgets.QLabel('BPF'), 0, 0)
         self.main_layout.addWidget(self.filters, 0, 1)
         self.main_layout.addWidget(QtWidgets.QLabel('Gain'))
@@ -81,11 +117,14 @@ class BpfBlock(QtWidgets.QGroupBox):
 
 
 class PreselectorMode(QtWidgets.QGroupBox):
+    mode_changed = QtCore.pyqtSignal(int)
+
     def __init__(self):
         QtWidgets.QGroupBox.__init__(self, 'Mode')
 
         self.bypass = QtWidgets.QRadioButton('Bypass')
         self.filters = QtWidgets.QRadioButton('Filters')
+        self.filters.click()
         self.off = QtWidgets.QRadioButton('Off')
         self.wifi = QtWidgets.QRadioButton('WIFI 2.4GHz')
 
@@ -96,10 +135,31 @@ class PreselectorMode(QtWidgets.QGroupBox):
         layout.addWidget(self.off)
         layout.addWidget(self.wifi)
 
+        self.items = \
+            {
+                0: self.bypass,
+                1: self.filters,
+                2: self.off,
+                3: self.wifi,
+            }
 
-class Preselector(QtWidgets.QWidget):
-    def __init__(self):
-        QtWidgets.QWidget.__init__(self)
+        self.bypass.clicked.connect(lambda: self.mode_changed.emit(0))
+        self.filters.clicked.connect(lambda: self.mode_changed.emit(1))
+        self.off.clicked.connect(lambda: self.mode_changed.emit(2))
+        self.wifi.clicked.connect(lambda: self.mode_changed.emit(3))
+
+    def set_mode(self, num: int):
+        try:
+            self.items[num].blockSignals(True)
+            self.items[num].click()
+            self.items[num].blockSignals(False)
+        except Exception as e:
+            print(f'Preselector mode value [{e}] ERROR!')
+
+
+class Preselector(QtWidgets.QGroupBox):
+    def __init__(self, embed=False):
+        QtWidgets.QGroupBox.__init__(self, 'Preselector')
         self.band = 0
         self.main_layout = QtWidgets.QGridLayout()
         self.setLayout(self.main_layout)
@@ -111,13 +171,98 @@ class Preselector(QtWidgets.QWidget):
         self.bpf_block = BpfBlock()
 
         self.main_layout.addWidget(self.mode, 0, 0)
-        self.main_layout.addWidget(QtWidgets.QLabel('Band'), 1, 0)
-        self.main_layout.addWidget(self.band, 2, 0)
+        if embed:
+            self.main_layout.addWidget(QtWidgets.QLabel('Band'), 1, 0)
+            self.main_layout.addWidget(self.band, 2, 0)
         self.main_layout.addWidget(self.preamplifier, 0, 1, 3, 2)
         self.main_layout.addWidget(self.bpf_block, 0, 4, 3, 2)
 
 
-PreamplifierFilters =\
+class LORange(QtWidgets.QGroupBox):
+    range_changed = QtCore.pyqtSignal(int)
+
+    def __init__(self):
+        QtWidgets.QGroupBox.__init__(self, 'Range')
+        self.main_layout = QtWidgets.QGridLayout()
+        self.setLayout(self.main_layout)
+
+        self.high = QtWidgets.QRadioButton('High')
+        self.low = QtWidgets.QRadioButton('Low')
+        self.high.setChecked(True)
+
+        self.main_layout.addWidget(self.high)
+        self.main_layout.addWidget(self.low)
+
+        self.items = \
+            {
+                0: self.low,
+                1: self.high,
+            }
+        self.low.clicked.connect(lambda: self.range_changed.emit(0))
+        self.high.clicked.connect(lambda: self.range_changed.emit(1))
+
+    def set_range(self, num: int):
+        try:
+            self.items[num].blockSignals(True)
+            self.items[num].click()
+            self.items[num].blockSignals(False)
+        except Exception as e:
+            print(f'Preselector mode value [{e}] ERROR!')
+
+class LO(QtWidgets.QGroupBox):
+    def __init__(self, num, gain_on=True):
+        QtWidgets.QGroupBox.__init__(self, 'LO' + str(num))
+        self.main_layout = QtWidgets.QGridLayout()
+        self.setLayout(self.main_layout)
+
+        self.range = LORange()
+        self.freq = QtWidgets.QSpinBox()
+        self.freq.setMinimum(10)
+        self.freq.setMaximum(15000)
+        self.level = QtWidgets.QSpinBox()
+        self.level.setDisabled(True)
+        self.gain = Gain()
+
+        self.main_layout.addWidget(self.range, 0, 1)
+        self.main_layout.addWidget(QtWidgets.QLabel('Frequency'), 1, 0)
+        self.main_layout.addWidget(self.freq, 1, 1, 1, 2)
+        self.main_layout.addWidget(QtWidgets.QLabel('Level'), 2, 0)
+        self.main_layout.addWidget(self.level, 2, 1, 1, 2)
+        if gain_on:
+            self.main_layout.addWidget(QtWidgets.QLabel('Gain'), 3, 0)
+            self.main_layout.addWidget(self.gain, 3, 1, 1, 2)
+
+    def set_freq(self, value):
+        self.freq.blockSignals(True)
+        self.freq.setValue(value)
+        self.freq.blockSignals(False)
+
+
+class URP(QtWidgets.QWidget):
+
+    def __init__(self):
+        QtWidgets.QWidget.__init__(self)
+        self.main_layout = QtWidgets.QGridLayout()
+        self.setLayout(self.main_layout)
+
+        self.preselector = Preselector()
+        self.lo1 = LO(1)
+        self.lo2 = LO(2, False)
+
+        # self.preselector.mode.mode_changed.connect()
+        # self.preselector.preamplifier.gain.value_changed.connect()
+        # self.preselector.bpf_block.gain.value_changed.connect()
+        # self.lo1.freq.valueChanged.connect()
+        # self.lo1.gain.value_changed.connect()
+        # self.lo1.range.range_changed.connect()
+
+
+        self.main_layout.addWidget(self.preselector, 0, 0)
+        self.main_layout.addWidget(self.lo1, 1, 1)
+        self.main_layout.addWidget(self.lo2, 1, 3)
+
+
+PreamplifierFilters = \
     {
         1: 'Off',
         2: 'Bypass',

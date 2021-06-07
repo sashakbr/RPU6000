@@ -11,6 +11,7 @@ signal_type = namedtuple('Signal', ['name', 'value'])
 signal_cmd = namedtuple('CMD', ['name', 'value', 'position'])
 signal_info = namedtuple('info', ['text', 'font'])
 
+
 class CustomDialog(QDialog):
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
@@ -29,6 +30,7 @@ class CustomDialog(QDialog):
         self.layout.addWidget(self.buttonBox)
         self.setLayout(self.layout)
 
+
 class SaveDialog(QDialog):
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)
@@ -46,6 +48,7 @@ class SaveDialog(QDialog):
         self.layout.addSpacing(20)
         self.layout.addWidget(self.buttonBox)
         self.setLayout(self.layout)
+
 
 def uint_to_bytes(number: int):
     """

@@ -35,8 +35,9 @@ class MainWindow(QMainWindow):
         self.create_sp()
         self.create_cmd_viewer_docker()
         self.cmd_creator = CmdCreatorWidget()
-        self.create_monitor_docker()
-        self.create_preselector_docker()
+        #self.create_monitor_docker()
+        #self.create_preselector_docker()
+        self.create_urp_docker()
 
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.sp.signal_info.connect(self.show_info, Qt.QueuedConnection)
@@ -80,6 +81,13 @@ class MainWindow(QMainWindow):
         self.docker_preselector .setWidget(self.preselector)
         self.addDockWidget(Qt.RightDockWidgetArea, self.docker_preselector)
         self.view_menu.addAction(self.docker_preselector .toggleViewAction())
+
+    def create_urp_docker(self):
+        self.urp = new.URP()
+        self.docker_urp = QDockWidget('URP', self)
+        self.docker_urp .setWidget(self.urp)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.docker_urp)
+        self.view_menu.addAction(self.docker_urp .toggleViewAction())
 
     def sp_signal_handling(self, signal):
         if signal.name == 'cmd':
