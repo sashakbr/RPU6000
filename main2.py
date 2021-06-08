@@ -38,6 +38,7 @@ class MainWindow(QMainWindow):
         #self.create_monitor_docker()
         #self.create_preselector_docker()
         self.create_urp_docker()
+        self.create_power_calculator_docker()
 
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.sp.signal_info.connect(self.show_info, Qt.QueuedConnection)
@@ -46,12 +47,14 @@ class MainWindow(QMainWindow):
         self.cmd_viewer.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
         self.cmd_viewer.add_cmd_btn.clicked.connect(self.open_cmd_creator)
         self.cmd_viewer.signal_info.connect(self.show_info, Qt.QueuedConnection)
+        self.power_calculator.signal.connect(self.power_calculator_handling, Qt.QueuedConnection)
 
         self.file_menu.addAction(QIcon('icons\\folder.svg'), 'Open', self.cmd_viewer.open_file_dialog, shortcut='Ctrl+O')
         self.file_menu.addAction(QIcon('icons\\save.svg'), 'Save', self.cmd_viewer.save_file_changes, shortcut='Ctrl+S')
         self.file_menu.addAction(QIcon('icons\\save.svg'), 'Save to..', self.cmd_viewer.save_to)
         self.file_menu.addSeparator()
         self.file_menu.addAction(QIcon('icons\\x.svg'), 'Exit', self.close, shortcut='Ctrl+Q')
+        print(self.size())
 
     def open_cmd_creator(self):
         self.cmd_creator.show()
@@ -67,6 +70,13 @@ class MainWindow(QMainWindow):
         self.docker_cmd_viewer.setWidget(self.cmd_viewer)
         self.addDockWidget(Qt.RightDockWidgetArea, self.docker_cmd_viewer)
         self.view_menu.addAction(self.docker_cmd_viewer.toggleViewAction())
+
+    def create_power_calculator_docker(self):
+        self.power_calculator = PowerCalculator()
+        self.docker_power_calculator = QDockWidget('Power calculator', self)
+        self.docker_power_calculator.setWidget(self.power_calculator)
+        self.addDockWidget(Qt.RightDockWidgetArea, self.docker_power_calculator)
+        self.view_menu.addAction(self.docker_power_calculator.toggleViewAction())
 
     def create_monitor_docker(self):
         self.monitor = new.Monitor()
@@ -102,6 +112,11 @@ class MainWindow(QMainWindow):
         if signal.name == 'edit_cmd':
             self.cmd_creator.edit_cmd(signal.value[0], dict([signal.value]))
             self.cmd_creator.show()
+
+    def power_calculator_handling(self, signal):
+        if signal.name == 'send_cmd':
+            cmd = self.sp.write_read(signal.value)
+            self.power_calculator.set_power(signal.value)
 
     def show_info(self, signal: signal_info):
         if signal.font is None:
