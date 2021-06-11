@@ -1,4 +1,4 @@
-import pyqtgraph as pg
+import pyqtgraph_test as pg
 from PyQt5 import QtCore, QtWidgets, QtGui
 from enum import Enum
 
@@ -253,6 +253,7 @@ class LO(QtWidgets.QGroupBox):
 
     def set_gain(self, value: int):
         self.gain.set_value(value)
+
 
 class Out(QtWidgets.QGroupBox):
     def __init__(self):
