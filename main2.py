@@ -1,3 +1,6 @@
+# coding:utf-8
+
+import random
 import sys
 import os
 from PyQt5.QtWidgets import QApplication, QMainWindow, QDockWidget, QStyleFactory, QStatusBar, QGraphicsEffect
@@ -35,11 +38,11 @@ class MainWindow(QMainWindow):
         self.create_sp()
         self.create_cmd_viewer_docker()
         self.cmd_creator = CmdCreatorWidget()
-        #self.create_monitor_docker()
-        #self.create_preselector_docker()
+        self.create_monitor_docker()
+        # self.create_preselector_docker()
         self.create_urp_docker()
-        self.create_power_calculator_docker()
 
+        self.monitor.signal.connect(self.monitor_signal_handling, Qt.QueuedConnection)
         self.sp.signal.connect(self.sp_signal_handling, Qt.QueuedConnection)
         self.sp.signal_info.connect(self.show_info, Qt.QueuedConnection)
         self.cmd_creator.signal_cmd.connect(self.cmd_viewer.add_cmd, Qt.QueuedConnection)
@@ -47,14 +50,15 @@ class MainWindow(QMainWindow):
         self.cmd_viewer.signal.connect(self.cmd_signal_handling, Qt.QueuedConnection)
         self.cmd_viewer.add_cmd_btn.clicked.connect(self.open_cmd_creator)
         self.cmd_viewer.signal_info.connect(self.show_info, Qt.QueuedConnection)
-        self.power_calculator.signal.connect(self.power_calculator_handling, Qt.QueuedConnection)
 
-        self.file_menu.addAction(QIcon('icons\\folder.svg'), 'Open', self.cmd_viewer.open_file_dialog, shortcut='Ctrl+O')
+        self.file_menu.addAction(QIcon('icons\\folder.svg'), 'Open', self.cmd_viewer.open_file_dialog,
+                                 shortcut='Ctrl+O')
         self.file_menu.addAction(QIcon('icons\\save.svg'), 'Save', self.cmd_viewer.save_file_changes, shortcut='Ctrl+S')
         self.file_menu.addAction(QIcon('icons\\save.svg'), 'Save to..', self.cmd_viewer.save_to)
         self.file_menu.addSeparator()
         self.file_menu.addAction(QIcon('icons\\x.svg'), 'Exit', self.close, shortcut='Ctrl+Q')
-        print(self.size())
+
+        self.docker_urp.setVisible(False)
 
     def open_cmd_creator(self):
         self.cmd_creator.show()
@@ -71,15 +75,8 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.docker_cmd_viewer)
         self.view_menu.addAction(self.docker_cmd_viewer.toggleViewAction())
 
-    def create_power_calculator_docker(self):
-        self.power_calculator = PowerCalculator()
-        self.docker_power_calculator = QDockWidget('Power calculator', self)
-        self.docker_power_calculator.setWidget(self.power_calculator)
-        self.addDockWidget(Qt.RightDockWidgetArea, self.docker_power_calculator)
-        self.view_menu.addAction(self.docker_power_calculator.toggleViewAction())
-
     def create_monitor_docker(self):
-        self.monitor = new.Monitor()
+        self.monitor = new.Monitor(count=3, names=['Out', 'LO1', 'LO2'])
         self.docker_monitor = QDockWidget('Monitor', self)
         self.docker_monitor.setWidget(self.monitor)
         self.addDockWidget(Qt.RightDockWidgetArea, self.docker_monitor)
@@ -87,17 +84,17 @@ class MainWindow(QMainWindow):
 
     def create_preselector_docker(self):
         self.preselector = new.Preselector()
-        self.docker_preselector  = QDockWidget('Preselector ', self)
-        self.docker_preselector .setWidget(self.preselector)
+        self.docker_preselector = QDockWidget('Preselector ', self)
+        self.docker_preselector.setWidget(self.preselector)
         self.addDockWidget(Qt.RightDockWidgetArea, self.docker_preselector)
-        self.view_menu.addAction(self.docker_preselector .toggleViewAction())
+        self.view_menu.addAction(self.docker_preselector.toggleViewAction())
 
     def create_urp_docker(self):
         self.urp = new.URP()
         self.docker_urp = QDockWidget('URP', self)
-        self.docker_urp .setWidget(self.urp)
+        self.docker_urp.setWidget(self.urp)
         self.addDockWidget(Qt.RightDockWidgetArea, self.docker_urp)
-        self.view_menu.addAction(self.docker_urp .toggleViewAction())
+        self.view_menu.addAction(self.docker_urp.toggleViewAction())
 
     def sp_signal_handling(self, signal):
         if signal.name == 'cmd':
@@ -106,6 +103,16 @@ class MainWindow(QMainWindow):
     def cmd_signal_byte_handling(self, signal):
         if signal.name == 'send_cmd':
             self.sp.write(signal.value)
+
+    def monitor_signal_handling(self):
+        if self.sp.connection.is_open():
+            try:
+                temp_out = int(self.sp.write_read(b'\x00\x0A\x00')[2])
+                temp_lo1 = int(self.sp.write_read(b'\x10\x0A\x00')[2])
+                temp_lo2 = int(self.sp.write_read(b'\x11\x0A\x00')[2])
+                self.monitor.appendData([temp_out, temp_lo1, temp_lo2])
+            except:
+                print("monitor_signal_handling: IndexError: index out of range")
 
     def cmd_signal_handling(self, signal):
         print(signal.name)

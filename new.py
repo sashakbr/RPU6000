@@ -1,21 +1,81 @@
-import pyqtgraph_test as pg
+import pyqtgraph as pg
 from PyQt5 import QtCore, QtWidgets, QtGui
 from enum import Enum
-
+import numpy as np
 
 class Monitor(QtWidgets.QWidget):
-    def __init__(self):
+    signal = QtCore.pyqtSignal()
+
+    def __init__(self, count: int, names: list):
         QtWidgets.QWidget.__init__(self)
         self.cmd = b''
         self.main_layout = QtWidgets.QGridLayout()
         self.setLayout(self.main_layout)
+        self.buf = [[], [], []]
+        self.ind = 0
 
-        self.graphWidget = pg.PlotWidget()
-        self.graphWidget.setBackground('w')
-        self.dsb_update = QtWidgets.QDoubleSpinBox()
+        self.graphWidget = pg.GraphicsLayoutWidget()
+        #self.graphWidget.setBackground('w')
+        self.plot = self.graphWidget.addPlot()
+        self.plot.addLegend()
+        colors = [(0, 0, 200), (100, 200, 0), (126, 47, 142), (0, 114, 189),  (0, 128, 0)]
+        self.curves = []
+        for i in range(count):
+            self.curves.append(self.plot.plot(self.buf[i], name=names[i], pen=colors[i], penSize=8))
+
+        self.btn_start = QtWidgets.QPushButton('Start')
+        self.btn_start.setCheckable(True)
+
+        self.dsb_timeout = QtWidgets.QDoubleSpinBox()
+        self.dsb_timeout.setMaximum(1000)
+        self.dsb_timeout.setValue(5)
+
+        self.sb_points = QtWidgets.QSpinBox()
+        self.sb_points.setMaximum(10000)
+        self.sb_points.setValue(200)
+
         self.main_layout.addWidget(self.graphWidget, 0, 0, 5, 8)
-        self.main_layout.addWidget(QtWidgets.QLabel('Timeout, s'), 5, 0)
-        self.main_layout.addWidget(self.dsb_update, 5, 1)
+        self.main_layout.addWidget(QtWidgets.QLabel('Timeout, s'), 9, 0)
+        self.main_layout.addWidget(self.dsb_timeout, 9, 1)
+        self.main_layout.addWidget(QtWidgets.QLabel('Amount of points'), 9, 2)
+        self.main_layout.addWidget(self.sb_points, 9, 3)
+        self.main_layout.addWidget(self.btn_start, 9, 4)
+        self.btn_start.clicked.connect(self.timer_event)
+
+    def timer_event(self):
+        if self.btn_start.isChecked():
+            self.ind = 0
+            self.buf = [[], [], []]
+            self.start_timer()
+        else:
+            self.stop_timer()
+
+    def start_timer(self):
+        self.timer = self.startTimer(int(self.dsb_timeout.value()*1000), QtCore.Qt.VeryCoarseTimer)
+        self.btn_start.setText('Stop')
+        self.dsb_timeout.setDisabled(True)
+
+    def stop_timer(self):
+        self.killTimer(self.timer)
+        self.btn_start.setText('Start')
+        self.dsb_timeout.setDisabled(False)
+
+    def timerEvent(self, event):
+        self.signal.emit()
+
+    def appendData(self, temp: list):
+        self.ind += 1
+        for i in range(len(temp)):
+            if len(self.buf[i]) == self.sb_points.value():
+                self.buf[i].append(temp[i])
+                self.buf[i] = self.buf[i][1:]
+                self.curves[i].setPos(self.ind, 0)
+            elif len(self.buf[i]) > self.sb_points.value():
+                self.buf[i].append(temp[i])
+                self.buf[i] = self.buf[i][len(self.buf[i]) - self.sb_points.value():]
+            else:
+                self.buf[i].append(temp[i])
+            self.curves[i].setData(np.array(self.buf[i]))
 
 
 class Filters(QtWidgets.QComboBox):

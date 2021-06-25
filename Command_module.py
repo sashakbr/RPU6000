@@ -1068,36 +1068,3 @@ class WidgetBitField(QDialog):
 
     def get_byte_item(self):
         return self.byte_
-
-
-class PowerCalculator(QWidget):
-    signal = pyqtSignal(signal_cmd)
-
-    def __init__(self):
-        super().__init__()
-        self.main_layout = QGridLayout()
-        self.setLayout(self.main_layout)
-
-        self.cb_addresses = QComboBox()
-        self.cb_addresses.addItem('address 1', 0x10)
-
-        self.pb_send = QPushButton('Send')
-
-        self.sb_power = QSpinBox()
-        self.sb_power.setDisabled(True)
-
-        self.main_layout.addWidget(QLabel('Address'), 0, 0)
-        self.main_layout.addWidget(self.cb_addresses, 0, 1)
-        self.main_layout.addWidget(self.pb_send, 0, 2)
-        self.main_layout.addWidget(QLabel('Power'), 1, 0)
-        self.main_layout.addWidget(self.sb_power, 1, 1, 1, 2)
-
-        self.pb_send.clicked.connect(self.request)
-
-    def request(self):
-        address = uint_to_bytes(self.cb_addresses.currentData())
-        self.signal.emit(signal_cmd('send_cmd', address + b'\x0f\x00', 1))
-
-    def set_power(self, cmd: bytes):
-        value = int(cmd[2])
-        self.sb_power.setValue(value)
