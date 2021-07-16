@@ -9,7 +9,7 @@ import numpy as np
 import pyqtgraph.ptime as ptime
 import socket
 
-buf_size = 4096 # размер буфера для отображения
+buf_size = 4096     # размер буфера для отображения
 HOST_client = '192.168.1.21'
 PORT_client = 2000
 HOST_server = '192.168.1.22'

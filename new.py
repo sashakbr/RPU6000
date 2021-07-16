@@ -3,6 +3,42 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 from enum import Enum
 import numpy as np
 
+class LCDArrayWidget(QtWidgets.QWidget):
+    def __init__(self, count: int, orientation='h'):
+        QtWidgets.QWidget.__init__(self)
+        if orientation == 'v':
+            self.main_layout = QtWidgets.QVBoxLayout()
+        else:
+            self.main_layout = QtWidgets.QHBoxLayout()
+        self.setLayout(self.main_layout)
+        self.widgets = []
+
+        for i in range(count):
+            widget = QtWidgets.QLCDNumber()
+            self.widgets.append(widget)
+            self.main_layout.addWidget(widget)
+            widget.setSegmentStyle(QtWidgets.QLCDNumber.Flat)
+            widget.setDigitCount(4)
+
+    def set_value(self, values: list or tuple):
+        for i, widget in enumerate(self.widgets):
+            try:
+                widget.display(values[i])
+                widget.setEnabled(True)
+            except IndexError:
+                widget.display('--')
+                widget.setEnabled(False)
+        # for i in range(len(self.widgets)):
+        #     try:
+        #         self.widgets[i].display(value[i])
+        #         self.widgets[i].setEnabled(True)
+        #     except:
+        #         self.widgets[i].display('--')
+        #         self.widgets[i].setEnabled(False)
+
+
+
+
 class Monitor(QtWidgets.QWidget):
     signal = QtCore.pyqtSignal()
 
@@ -17,7 +53,10 @@ class Monitor(QtWidgets.QWidget):
         self.graphWidget = pg.GraphicsLayoutWidget()
         #self.graphWidget.setBackground('w')
         self.plot = self.graphWidget.addPlot()
-        self.plot.addLegend()
+        self.plot_legend = self.plot.addLegend(offset=(-25, 10))
+        self.plot.showGrid(x=False, y=True)
+        self.plot.showAxis('bottom', show=False)
+
         colors = [(0, 0, 200), (100, 200, 0), (126, 47, 142), (0, 114, 189),  (0, 128, 0)]
         self.curves = []
         for i in range(count):
@@ -34,28 +73,36 @@ class Monitor(QtWidgets.QWidget):
         self.sb_points.setMaximum(10000)
         self.sb_points.setValue(200)
 
-        self.main_layout.addWidget(self.graphWidget, 0, 0, 5, 8)
-        self.main_layout.addWidget(QtWidgets.QLabel('Timeout, s'), 9, 0)
-        self.main_layout.addWidget(self.dsb_timeout, 9, 1)
-        self.main_layout.addWidget(QtWidgets.QLabel('Amount of points'), 9, 2)
-        self.main_layout.addWidget(self.sb_points, 9, 3)
-        self.main_layout.addWidget(self.btn_start, 9, 4)
+        self.int_array = LCDArrayWidget(count)
+
+        self.main_layout.addWidget(self.btn_start, 0, 0)
+        self.main_layout.addWidget(self.int_array, 0, 7)
+        self.main_layout.addWidget(self.graphWidget, 1, 0, 5, 8)
+
+        self.main_layout.addWidget(QtWidgets.QLabel('Timeout, s'), 10, 0)
+        self.main_layout.addWidget(self.dsb_timeout, 10, 1)
+        self.main_layout.addWidget(QtWidgets.QLabel('Amount of points'), 10, 3)
+        self.main_layout.addWidget(self.sb_points, 10, 4)
+
         self.btn_start.clicked.connect(self.timer_event)
+
+    def set_left_lable(self, text: str, units=None):
+        self.plot.setLabel('left', text, units=units)
 
     def timer_event(self):
         if self.btn_start.isChecked():
             self.ind = 0
             self.buf = [[], [], []]
-            self.start_timer()
+            self.__start_timer()
         else:
-            self.stop_timer()
+            self.__stop_timer()
 
-    def start_timer(self):
+    def __start_timer(self):
         self.timer = self.startTimer(int(self.dsb_timeout.value()*1000), QtCore.Qt.VeryCoarseTimer)
         self.btn_start.setText('Stop')
         self.dsb_timeout.setDisabled(True)
 
-    def stop_timer(self):
+    def __stop_timer(self):
         self.killTimer(self.timer)
         self.btn_start.setText('Start')
         self.dsb_timeout.setDisabled(False)
@@ -63,19 +110,35 @@ class Monitor(QtWidgets.QWidget):
     def timerEvent(self, event):
         self.signal.emit()
 
-    def appendData(self, temp: list):
+    def appendData(self, temps: list):
         self.ind += 1
-        for i in range(len(temp)):
+        self.int_array.set_value(temps)
+        for i, temp in enumerate(temps):
             if len(self.buf[i]) == self.sb_points.value():
-                self.buf[i].append(temp[i])
+                self.buf[i].append(temp)
                 self.buf[i] = self.buf[i][1:]
                 self.curves[i].setPos(self.ind, 0)
             elif len(self.buf[i]) > self.sb_points.value():
-                self.buf[i].append(temp[i])
+                self.buf[i].append(temp)
                 self.buf[i] = self.buf[i][len(self.buf[i]) - self.sb_points.value():]
             else:
-                self.buf[i].append(temp[i])
+                self.buf[i].append(temp)
             self.curves[i].setData(np.array(self.buf[i]))
+
+    # self.ind += 1
+        # self.int_array.set_value(temp)
+        # for i in range(len(temp)):
+        #     if len(self.buf[i]) == self.sb_points.value():
+        #         self.buf[i].append(temp[i])
+        #         self.buf[i] = self.buf[i][1:]
+        #         self.curves[i].setPos(self.ind, 0)
+        #     elif len(self.buf[i]) > self.sb_points.value():
+        #         self.buf[i].append(temp[i])
+        #         self.buf[i] = self.buf[i][len(self.buf[i]) - self.sb_points.value():]
+        #     else:
+        #         self.buf[i].append(temp[i])
+        #     self.curves[i].setData(np.array(self.buf[i]))
+
 
 
 class Filters(QtWidgets.QComboBox):
