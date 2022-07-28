@@ -184,7 +184,6 @@
             "max": 255,
             "step": 1
         }
-
     },
     "Включение/выключение предусилителя ": {
         "Command num": {
@@ -299,6 +298,24 @@
             "min": 0,
             "max": 31,
             "step": 1
+        }
+    },
+    "Test": {
+        "Command num": {
+            "type": "const_num",
+            "def_value": 3
+        },
+        "Some 0x0A": {
+            "type": "enum",
+            "values": {
+                "Item A": 10
+            }
+        },
+        "Some 0x00": {
+            "type": "enum",
+            "values": {
+                "Item 0": 0
+            }
         }
     }
 }

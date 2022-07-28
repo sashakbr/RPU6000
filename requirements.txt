@@ -1,0 +1,5 @@
+loguru==0.6.0
+numpy==1.23.0
+PyQt5==5.15.7
+pyqtgraph==0.12.4
+pyserial==3.5

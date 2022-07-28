@@ -3,6 +3,7 @@ from PyQt5 import QtCore, QtWidgets, QtGui
 from enum import Enum
 import numpy as np
 
+
 class LCDArrayWidget(QtWidgets.QWidget):
     def __init__(self, count: int, orientation='h'):
         QtWidgets.QWidget.__init__(self)
@@ -35,8 +36,6 @@ class LCDArrayWidget(QtWidgets.QWidget):
         #     except:
         #         self.widgets[i].display('--')
         #         self.widgets[i].setEnabled(False)
-
-
 
 
 class Monitor(QtWidgets.QWidget):
@@ -138,7 +137,6 @@ class Monitor(QtWidgets.QWidget):
         #     else:
         #         self.buf[i].append(temp[i])
         #     self.curves[i].setData(np.array(self.buf[i]))
-
 
 
 class Filters(QtWidgets.QComboBox):

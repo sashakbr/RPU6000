@@ -50,7 +50,7 @@ class SaveDialog(QDialog):
         self.setLayout(self.layout)
 
 
-def uint_to_bytes(number: int):
+def uint_to_bytes(number: int) -> bytes:
     """
     Перевод целых чисел в набор байт для случаев, когда число больше 255 (больше uint_8)
     :param number: int

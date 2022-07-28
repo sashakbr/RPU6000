@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QWidget, QLabel, QComboBox, QPushButton, QTextEdit, 
 import serial
 from utility import *
 from SP_settings import *
-import tread_test
+import connection_drivers
 import queue
 from datetime import datetime
 
@@ -20,14 +20,14 @@ def get_available_ports():
     return portsName
 
 
-class SP2(QWidget):
+class Widget(QWidget):
     signal = pyqtSignal(signal_type)
     signal_info = pyqtSignal(signal_info)
 
     def __init__(self):
         super().__init__()
         self.queue = queue.Queue()
-        self.connection = tread_test.SerialTread(self.queue)
+        self.connection = connection_drivers.SerialTread(self.queue)
         self._create_widgets()
         self._set_widget_layouts()
         self._set_events()
@@ -48,7 +48,7 @@ class SP2(QWidget):
         self.event_update_ports_name()
 
         self.update_port_name_btn = QPushButton()
-        self.update_port_name_btn.setIcon(QIcon('icons\\refresh.png'))
+        self.update_port_name_btn.setIcon(QIcon(r'icons/refresh.png'))
         self.update_port_name_btn.setFixedSize(26, 26)
 
         self.l_BaudRate = QLabel('Baudrate')
@@ -68,7 +68,7 @@ class SP2(QWidget):
 
         # кнопка дополнительных настроек COM порта
         self.pb_settings = QPushButton()
-        self.pb_settings.setIcon(QIcon('icons\\settings.svg'))
+        self.pb_settings.setIcon(QIcon(r'icons/settings.svg'))
         self.pb_settings.setFixedSize(26, 26)
         # индикатор подключения
         self.pb_con_state = QPushButton()
@@ -80,7 +80,7 @@ class SP2(QWidget):
         self.te_log.setFont(QFont('Consolas', 9))
         # кнопка очистки лога
         self.clear_btn = QPushButton('Clear')
-        self.clear_btn.setIcon(QIcon('icons\\trash.svg'))
+        self.clear_btn.setIcon(QIcon(r'icons/trash.svg'))
         # галочка включения парсинга принятой команды согласно команд в дереве
         self.cb_parsing = QCheckBox('Parsing')
         self.cb_parsing.setFixedSize(60, 15)
@@ -167,7 +167,7 @@ class SP2(QWidget):
     @pyqtSlot()
     def event_connect(self):
         if self.connection.is_open():
-            self.queue.put(tread_test.event_('close_port', None))
+            self.queue.put(connection_drivers.event_('close_port', None))
         else:
             self.connection.set_baudrate(self.cb_BaudRate.currentData())
             self.set_connection_settings()
@@ -206,13 +206,13 @@ class SP2(QWidget):
         self.cb_PortName.setDisabled(True)
         self.pb_settings.setDisabled(True)
 
-    @pyqtSlot(tread_test.fail)
-    def connection_is_fail(self, fail: tread_test.fail):
+    @pyqtSlot(connection_drivers.fail)
+    def connection_is_fail(self, fail: connection_drivers.fail):
         str_time = (fail.time.strftime('%H:%M:%S.%f')[:-3])
         self.log_info(f'{str_time}  {fail.text}', color='red')
 
-    @pyqtSlot(tread_test.parcel)
-    def log_parcel(self, parcel: tread_test.parcel):
+    @pyqtSlot(connection_drivers.parcel)
+    def log_parcel(self, parcel: connection_drivers.parcel):
         str_time = (parcel.time.strftime('%H:%M:%S.%f')[:-3])
 
         if parcel.type == 'TX':
@@ -232,7 +232,7 @@ class SP2(QWidget):
     def write(self, tx_data: bytes):
         if self.connection.is_open():
             #self.connection.write(tx_data)
-            self.queue.put(tread_test.event_('write', tx_data))  # правильнее работать с очередью
+            self.queue.put(connection_drivers.event_('write', tx_data))  # правильнее работать с очередью
         else:
             self.log_info('Serial port is not open!', 'red')
 

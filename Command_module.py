@@ -17,7 +17,7 @@ class CmdViewerWidget(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.setWindowIcon(QIcon('icons\\send.svg'))
+        self.setWindowIcon(QIcon(r'icons/send.svg'))
         self.__create_widgets()
         self.setMinimumWidth(550)
         self.btns_list = []  # список кнопок в дереве
@@ -46,7 +46,7 @@ class CmdViewerWidget(QWidget):
         self.file_dialog_btn.setShortcut('Ctrl+O')
         self.file_dialog_btn.setToolTip('Open command file (*.json)')
         self.file_dialog_btn.setFixedSize(60, 30)
-        self.file_dialog_btn.setIcon(QIcon('icons\\folder.svg'))
+        self.file_dialog_btn.setIcon(QIcon(r'icons/folder.svg'))
         file_layout = QHBoxLayout()
         file_layout.addWidget(QLabel('Path: '))
         file_layout.addWidget(self.file_path_lable)
@@ -58,16 +58,16 @@ class CmdViewerWidget(QWidget):
         self.l_current_cmd.setFont(QFont('Consolas', 9))
 
         self.del_cmd_btn = QPushButton('Delete')
-        self.del_cmd_btn.setIcon(QIcon('icons\\delete.svg'))
+        self.del_cmd_btn.setIcon(QIcon(r'icons/delete.svg'))
 
         self.add_cmd_btn = QPushButton('Add')
-        self.add_cmd_btn.setIcon(QIcon('icons\\plus-square.svg'))
+        self.add_cmd_btn.setIcon(QIcon(r'icons/plus-square.svg'))
 
         self.edit_cmd_btn = QPushButton('Edit')
-        self.edit_cmd_btn.setIcon(QIcon('icons\\edit.svg'))
+        self.edit_cmd_btn.setIcon(QIcon(r'icons/edit.svg'))
 
         self.sort_cmd_btn = QPushButton('Sort')
-        self.sort_cmd_btn.setIcon(QIcon('icons\\sort.svg'))
+        self.sort_cmd_btn.setIcon(QIcon(r'icons/sort.svg'))
 
         self.collapse_all_btn = QPushButton('Collapse all')
         self.expand_all_btn = QPushButton('Expand all')
@@ -380,7 +380,7 @@ class CmdCreatorWidget(QWidget):
         self.sb_cmd_num.setDisplayIntegerBase(16)
         self.sb_cmd_num.setMaximumHeight(40)
         self.btn_add_cmd = QPushButton('Create')
-        # self.btn_add_cmd.setIcon(QIcon('icons\\pl'))
+        # self.btn_add_cmd.setIcon(QIcon(r'icons/pl'))
         add_layout.addWidget(QLabel('Name: '))
         add_layout.addWidget(self.te_cmd_name)
         add_layout.addWidget(QLabel('Number: '))
@@ -396,16 +396,16 @@ class CmdCreatorWidget(QWidget):
 
         layout1 = QHBoxLayout()
         self.btn_clear_cmd = QPushButton('Clear')
-        self.btn_clear_cmd.setIcon(QIcon('icons\\trash.svg'))
+        self.btn_clear_cmd.setIcon(QIcon(r'icons/trash.svg'))
 
         self.btn_del_byte = QPushButton('Delete')
-        self.btn_del_byte.setIcon(QIcon('icons\\delete.svg'))
+        self.btn_del_byte.setIcon(QIcon(r'icons/delete.svg'))
 
         self.pb_up_byte = QPushButton('Up')
-        self.pb_up_byte.setIcon(QIcon('icons\\chevron-up.svg'))
+        self.pb_up_byte.setIcon(QIcon(r'icons/chevron-up.svg'))
 
         self.pb_down_byte = QPushButton('Down')
-        self.pb_down_byte.setIcon(QIcon('icons\\chevron-down.svg'))
+        self.pb_down_byte.setIcon(QIcon(r'icons/chevron-down.svg'))
 
         layout1.addWidget(self.btn_del_byte)
         layout1.addWidget(self.btn_clear_cmd)
@@ -422,7 +422,7 @@ class CmdCreatorWidget(QWidget):
         self.lw_byte_type.setCurrentRow(0)
 
         self.btn_add_byte = QPushButton('Add byte')
-        self.btn_add_byte.setIcon(QIcon('icons\\plus-square.svg'))
+        self.btn_add_byte.setIcon(QIcon(r'icons/plus-square.svg'))
         self.stack = QStackedWidget(self)
         self.layout_stack = QHBoxLayout()
         self.main_layout.addSpacing(30)
@@ -441,7 +441,7 @@ class CmdCreatorWidget(QWidget):
 
         v_line = QFrame()
         v_line.setFrameShape(QFrame.VLine)
-        v_line.setLineWidth(0.5)
+        #v_line.setLineWidth(0.5)
         self.layout_stack.addWidget(v_line)
 
         gb_byte_description = QGroupBox('Byte description')
@@ -540,7 +540,7 @@ class CmdCreatorWidget(QWidget):
         else:
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Information)
-            msg.setWindowIcon(QIcon('icons\\message-square.svg'))
+            msg.setWindowIcon(QIcon(r'icons/message-square.svg'))
             msg.setWindowTitle('Info')
             msg.setText('First, create a command.')
             msg.exec()
@@ -690,13 +690,13 @@ class WidgetEnum(QWidget):
         self.item_name.setMaximumHeight(24)
 
         self.pb_item_add = QPushButton('Add')
-        self.pb_item_add.setIcon(QIcon('icons\\plus.svg'))
+        self.pb_item_add.setIcon(QIcon(r'icons/plus.svg'))
 
         self.pb_item_del = QPushButton('Delete')
-        self.pb_item_del.setIcon(QIcon('icons\\delete.svg'))
+        self.pb_item_del.setIcon(QIcon(r'icons/delete.svg'))
 
         self.pb_clear_list = QPushButton('Clear')
-        self.pb_clear_list.setIcon(QIcon('icons\\trash.svg'))
+        self.pb_clear_list.setIcon(QIcon(r'icons/trash.svg'))
 
         add_layout.addWidget(QLabel('Name'))
         add_layout.addWidget(self.item_name)
@@ -974,9 +974,9 @@ class WidgetBitField(QDialog):
         self.te_byte_name = QTextEdit('Some bit field name')
         self.te_byte_name.setMaximumHeight(24)
         self.btn_create_byte = QPushButton('Create')
-        self.btn_create_byte.setIcon(QIcon('icons\\pl'))
+        self.btn_create_byte.setIcon(QIcon(r'icons/plus.svg'))
         self.btn_clear_byte = QPushButton('Clear')
-        self.btn_clear_byte.setIcon(QIcon('icons\\trash.svg'))
+        self.btn_clear_byte.setIcon(QIcon(r'icons/trash.svg'))
 
         add_layout.addWidget(QLabel('Name: '))
         add_layout.addWidget(self.te_byte_name)
@@ -988,9 +988,9 @@ class WidgetBitField(QDialog):
         self.cmdtree.setModel(self.model)
 
         self.btn_add_bool = QPushButton('Add bool')
-        self.btn_add_bool.setIcon(QIcon('icons\\plus.svg'))
+        self.btn_add_bool.setIcon(QIcon(r'icons/plus.svg'))
         self.btn_add_enum = QPushButton('Add enum')
-        self.btn_add_enum.setIcon(QIcon('icons\\plus.svg'))
+        self.btn_add_enum.setIcon(QIcon(r'icons/plus.svg'))
 
         layout_2 = QHBoxLayout()
         layout_2.addWidget(self.btn_add_bool)
@@ -1021,7 +1021,7 @@ class WidgetBitField(QDialog):
         else:
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Information)
-            msg.setWindowIcon(QIcon('icons\\message-square.svg'))
+            msg.setWindowIcon(QIcon(r'icons/message-square.svg'))
             msg.setWindowTitle('Info')
             msg.setText('First, create a bit field.')
             msg.exec()
