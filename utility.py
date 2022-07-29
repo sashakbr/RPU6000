@@ -11,7 +11,10 @@ signal_type = namedtuple('Signal', ['name', 'value'])
 signal_cmd = namedtuple('CMD', ['name', 'value', 'position'])
 signal_info = namedtuple('info', ['text', 'font'])
 
+from loguru import logger
 
+logger.debug("Start logging!")
+logger.add("log\\file_1.log", format="{time} {level} {message}", level="DEBUG", rotation="1 MB")
 class CustomDialog(QDialog):
     def __init__(self, text: str, parent=None):
         super().__init__(parent=parent)

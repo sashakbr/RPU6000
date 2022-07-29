@@ -39,7 +39,7 @@ class Widget(QWidget):
 
         self.l_port = QLabel('Server Port')
         self.le_port = QLineEdit()
-        self.le_port.setText('10001')
+        self.le_port.setText('20020')
         self.le_port.setFixedSize(120, 22)
 
         self.con_type = QComboBox()
@@ -84,7 +84,7 @@ class Widget(QWidget):
         layout3.addWidget(self.pb_con_state)
         layout3.addWidget(self.pb_connect)
 
-        sp_group = QGroupBox('Ethernet Port')
+        sp_group = QGroupBox('Ethernet Client')
         group_layout = QVBoxLayout()
         sp_group.setLayout(group_layout)
         self.sp_layout.addWidget(sp_group)

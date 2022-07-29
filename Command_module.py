@@ -1,8 +1,5 @@
 import sys
-from PyQt5.QtWidgets import (QComboBox, QLabel, QTextEdit, QListWidget, QGridLayout, QHBoxLayout, QVBoxLayout, QWidget,
-                             QPushButton, QSpinBox, QCheckBox, QSlider, QGroupBox, QSpacerItem, QSizePolicy,
-                             QMenu, QLCDNumber, QTreeWidget, QTreeWidgetItem, QTreeView, QFileDialog, QStackedWidget,
-                             QListWidgetItem, QMessageBox, QLayoutItem, QFrame, QAbstractItemView, QPlainTextEdit, QTableWidget, QTableWidgetItem)
+from PyQt5.QtWidgets import *
 from PyQt5.QtCore import pyqtSignal, Qt, QSignalMapper, QSize, QSettings
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon
 from utility import *
@@ -18,6 +15,7 @@ class CmdViewerWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowIcon(QIcon(r'icons/send.svg'))
+        self.cmd_creator = CmdCreatorWidget()
         self.__create_widgets()
         self.setMinimumWidth(550)
         self.btns_list = []  # список кнопок в дереве
@@ -45,7 +43,7 @@ class CmdViewerWidget(QWidget):
         self.file_dialog_btn = QPushButton('Open')
         self.file_dialog_btn.setShortcut('Ctrl+O')
         self.file_dialog_btn.setToolTip('Open command file (*.json)')
-        self.file_dialog_btn.setFixedSize(60, 30)
+        self.file_dialog_btn.setFixedSize(70, 30)
         self.file_dialog_btn.setIcon(QIcon(r'icons/folder.svg'))
         file_layout = QHBoxLayout()
         file_layout.addWidget(QLabel('Path: '))
@@ -93,6 +91,8 @@ class CmdViewerWidget(QWidget):
         self.sort_cmd_btn.clicked.connect(self.sort_cmds)
         self.collapse_all_btn.clicked.connect(self.cmdtree.collapseAll)
         self.expand_all_btn.clicked.connect(lambda: self.cmdtree.expandToDepth(1))
+        self.add_cmd_btn.clicked.connect(self.open_cmd_creator)
+        self.cmd_creator.signal_cmd.connect(self.add_cmd, Qt.QueuedConnection)
 
     def selection_item_changed(self, new, old):
         index = new.indexes()[0]
@@ -107,7 +107,9 @@ class CmdViewerWidget(QWidget):
             index = index.parent()
         cmd_name = index.data()
         if cmd_name is not None:
-            self.signal.emit(signal_type('edit_cmd', (cmd_name, self.cmd_data[cmd_name])))
+            #self.signal.emit(signal_type('edit_cmd', (cmd_name, self.cmd_data[cmd_name])))
+            self.cmd_creator.edit_cmd(cmd_name, {cmd_name: self.cmd_data[cmd_name]})
+            self.cmd_creator.show()
 
     def del_cmd(self):
         index = self.cmdtree.currentIndex()
@@ -115,18 +117,19 @@ class CmdViewerWidget(QWidget):
             index = index.parent()
         cmd_name = index.data()
         if cmd_name is not None:
-            dialog = CustomDialog('Вы уверенны что хотите удалить эту команду\n\"{}\"?'.format(index.data()))
+            dialog = CustomDialog('Are you sure you want to delete this command\n\"{}\"?'.format(index.data()))
             if dialog.exec_():
                 del self.cmd_data[cmd_name]
                 self.fill_tree(self.cmd_data)
                 self.change_flag = True
 
-    def add_cmd(self, cmd):
+    def add_cmd(self, cmd: signal_cmd):
         if self.cmd_data is None:
             self.cmd_data = {}
         self.cmd_data.update(cmd)
         self.fill_tree(self.cmd_data)
         self.change_flag = True
+        self.signal_info.emit(signal_info('ok', 'green'))
 
     def sort_cmds(self):
         if self.cmd_data is not None:
@@ -260,8 +263,8 @@ class CmdViewerWidget(QWidget):
                                 elif bit_description['type'] == 'bit_num':
                                     pass
 
-        self.mapper.mapped[str].connect(self.dicription_widget_data_changed)
-        self.mapper.mapped[int].connect(self.btn_press)
+        self.mapper.mapped[str].connect(self.description_widget_data_changed)
+        self.mapper.mapped[int].connect(self.btn_send_pressed)
         self.model.setHorizontalHeaderLabels(['Names', 'Values', 'Send buttons'])
         self.cmdtree.setColumnWidth(0, 390)
         self.cmdtree.setColumnWidth(1, 110)
@@ -302,14 +305,14 @@ class CmdViewerWidget(QWidget):
                     command += byte_.to_bytes(1, 'little', signed=False)
             return command, command_num_position
 
-    def btn_press(self, row_num):
+    def btn_send_pressed(self, row_num):
         """ Функция - обработчик нажатия на кнопку Send напротив команты.
          Составляет команду и отправляет ее сигналом."""
         command_item = self.model.item(row_num, 0)
         command, command_num_position = self.get_cmd_current_bytes(command_item)
         self.signal_bytes.emit(signal_cmd('send_cmd', command, command_num_position))
 
-    def dicription_widget_data_changed(self, row_num):
+    def description_widget_data_changed(self, row_num):
         item = self.model.item(int(row_num)-1, 0)
         cmd, cmd_num_position = self.get_cmd_current_bytes(item)
         self.signal_info.emit(signal_info('Hex: ' + bytes_to_hex_string(cmd), QFont('Consolas', 9)))
@@ -353,6 +356,12 @@ class CmdViewerWidget(QWidget):
                 return False
         else:
             return True
+
+    def open_cmd_creator(self):
+        self.cmd_creator.show()
+        self.cmd_creator.resize(600, 600)
+
+
 
 
 class CmdCreatorWidget(QWidget):
@@ -512,15 +521,20 @@ class CmdCreatorWidget(QWidget):
         self.model.clear()
         self.cmdtree.setDisabled(True)
 
+
     def del_byte(self):
         item_name = self.cmdtree.currentIndex().data()
         if item_name == "Command num":
             return
         elif item_name == self.cmd_name:
             return
+        elif item_name is None:
+            return
         else:
-            del self.cmd[self.cmd_name][item_name]
-            self.fill_tree()
+                logger.debug(f'From \'{self.cmd_name}\' delete item \'{item_name}\'')
+                del self.cmd[self.cmd_name][item_name]
+                self.fill_tree()
+
 
     def add_byte(self):
         if self.cmd != {}:
@@ -810,7 +824,7 @@ class WidgetBool(QWidget):
 
             self.sb_bit_num = QSpinBox()
             self.sb_bit_num.setMaximum(7)
-            self.sb_bit_num.setMinimumWidth(50)
+            self.sb_bit_num.setMinimumWidth(55)
 
             layout_bit = QHBoxLayout()
             self.main_layout.addLayout(layout_bit)
@@ -1068,3 +1082,12 @@ class WidgetBitField(QDialog):
 
     def get_byte_item(self):
         return self.byte_
+
+if __name__ == '__main__':
+    import sys
+    app = QApplication(sys.argv)
+    app.setStyle('Fusion')
+    window = CmdViewerWidget()
+    window.show()
+    sys.exit(app.exec_())
+
