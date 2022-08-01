@@ -117,14 +117,15 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, self.docker_urp)
         self.view_menu.addAction(self.docker_urp.toggleViewAction())
 
-    @pyqtSlot()
+    @pyqtSlot(signal_type)
     def sp_signal_handling(self, signal):
         if signal.name == 'cmd':
-            print(self.cmd_viewer.cmdtree.currentIndex().row())
+            logger.debug(f'{self.cmd_viewer.cmdtree.currentIndex().row()}')
 
     @pyqtSlot(signal_cmd)
     def cmd_signal_byte_handling(self, signal: signal_cmd):
         if signal.name == 'send_cmd':
+            logger.debug(f'signal cmd: {signal}')
             self.inteface_widget.write(signal.value)
 
     def monitor_signal_handling(self):
@@ -139,6 +140,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(signal_info)
     def show_info(self, signal: signal_info):
+        logger.debug(f'Info signal: {signal}')
         if signal.font is None:
             self.status_bar.setFont(self.font())
         else:

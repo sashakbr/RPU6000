@@ -129,8 +129,6 @@ class CmdViewerWidget(QWidget):
         self.cmd_data.update(cmd)
         self.fill_tree(self.cmd_data)
         self.change_flag = True
-        self.signal_info.emit(signal_info('ok', 'green'))
-
     def sort_cmds(self):
         if self.cmd_data is not None:
             self.cmd_data = dict(sorted(self.cmd_data.items()))
@@ -200,68 +198,72 @@ class CmdViewerWidget(QWidget):
                 cmd_name_item.appendRow([byte_name_item, byte_value_item])
                 byte_widget_index = self.model.indexFromItem(byte_value_item)
                 if type(byte_description) == dict:
-                    if byte_description['type'] == 'num':
-                        spin = QSpinBox()
-                        spin.setMinimum(byte_description['min'])
-                        spin.setMaximum(byte_description['max'])
-                        spin.setSingleStep(byte_description['step'])
-                        spin.setValue(byte_description['def_value'])
-                        self.cmdtree.setIndexWidget(byte_widget_index, spin)
-                        self.mapper.setMapping(spin, str(i))
-                        spin.valueChanged.connect(self.mapper.map)
+                    try:
+                        if byte_description['type'] == 'num':
+                            spin = QSpinBox()
+                            spin.setMinimum(byte_description['min'])
+                            spin.setMaximum(byte_description['max'])
+                            spin.setSingleStep(byte_description['step'])
+                            spin.setValue(byte_description['def_value'])
+                            self.cmdtree.setIndexWidget(byte_widget_index, spin)
+                            self.mapper.setMapping(spin, str(i))
+                            spin.valueChanged.connect(self.mapper.map)
 
-                    elif byte_description['type'] == 'enum':
-                        combo = QComboBox()
-                        for text_, data_ in byte_description['values'].items():
-                            combo.addItem(text_, data_)
-                        self.cmdtree.setIndexWidget(byte_widget_index, combo)
-                        self.mapper.setMapping(combo, str(i))
-                        combo.currentIndexChanged.connect(self.mapper.map)
+                        elif byte_description['type'] == 'enum':
+                            combo = QComboBox()
+                            for text_, data_ in byte_description['values'].items():
+                                combo.addItem(text_, data_)
+                            self.cmdtree.setIndexWidget(byte_widget_index, combo)
+                            self.mapper.setMapping(combo, str(i))
+                            combo.currentIndexChanged.connect(self.mapper.map)
 
-                    elif byte_description['type'] == 'const_num':
-                        spin = QSpinBox()
-                        spin.setMaximum(0xFF)
-                        spin.setValue(byte_description['def_value'])
-                        spin.setReadOnly(True)
-                        spin.setDisplayIntegerBase(16)
-                        spin.setPrefix('0x')
-                        spin.setDisabled(True)
-                        self.cmdtree.setIndexWidget(byte_widget_index, spin)
+                        elif byte_description['type'] == 'const_num':
+                            spin = QSpinBox()
+                            spin.setMaximum(0xFF)
+                            spin.setValue(byte_description['def_value'])
+                            spin.setReadOnly(True)
+                            spin.setDisplayIntegerBase(16)
+                            spin.setPrefix('0x')
+                            spin.setDisabled(True)
+                            self.cmdtree.setIndexWidget(byte_widget_index, spin)
 
-                    elif byte_description['type'] == 'bool':
-                        check = QCheckBox()
-                        check.setChecked(byte_description['def_state'])
-                        self.cmdtree.setIndexWidget(byte_widget_index, check)
-                        self.mapper.setMapping(check, str(i))
-                        check.stateChanged.connect(self.mapper.map)
+                        elif byte_description['type'] == 'bool':
+                            check = QCheckBox()
+                            check.setChecked(byte_description['def_state'])
+                            self.cmdtree.setIndexWidget(byte_widget_index, check)
+                            self.mapper.setMapping(check, str(i))
+                            check.stateChanged.connect(self.mapper.map)
 
-                    elif byte_description['type'] == 'bit_field':
-                        for bit_name, bit_description in byte_description['description'].items():
-                            bit_name_item = QStandardItem(bit_name)
-                            bit_value_item = QStandardItem()
-                            byte_name_item.appendRow([bit_name_item, bit_value_item])
-                            bit_widget_index = self.model.indexFromItem(bit_value_item)
-                            if type(bit_description) == dict:
-                                if bit_description['type'] == 'bit_enum':
-                                    combo = QComboBox()
-                                    combo.start_bit = bit_description['start_bit']
-                                    combo.quantity_bit = bit_description['quantity_bit']
-                                    for text_, data_ in bit_description['values'].items():
-                                        combo.addItem(text_, data_)
-                                    self.cmdtree.setIndexWidget(bit_widget_index, combo)
-                                    self.mapper.setMapping(combo, str(i))
-                                    combo.currentIndexChanged.connect(self.mapper.map)
+                        elif byte_description['type'] == 'bit_field':
+                            for bit_name, bit_description in byte_description['description'].items():
+                                bit_name_item = QStandardItem(bit_name)
+                                bit_value_item = QStandardItem()
+                                byte_name_item.appendRow([bit_name_item, bit_value_item])
+                                bit_widget_index = self.model.indexFromItem(bit_value_item)
+                                if type(bit_description) == dict:
+                                    if bit_description['type'] == 'bit_enum':
+                                        combo = QComboBox()
+                                        combo.start_bit = bit_description['start_bit']
+                                        combo.quantity_bit = bit_description['quantity_bit']
+                                        for text_, data_ in bit_description['values'].items():
+                                            combo.addItem(text_, data_)
+                                        self.cmdtree.setIndexWidget(bit_widget_index, combo)
+                                        self.mapper.setMapping(combo, str(i))
+                                        combo.currentIndexChanged.connect(self.mapper.map)
 
-                                elif bit_description['type'] == 'bit_bool':
-                                    check = QCheckBox()
-                                    check.setChecked(bit_description['def_state'])
-                                    check.bit_num = bit_description['bit_num']
-                                    self.cmdtree.setIndexWidget(bit_widget_index, check)
-                                    self.mapper.setMapping(check, str(i))
-                                    check.stateChanged.connect(self.mapper.map)
+                                    elif bit_description['type'] == 'bit_bool':
+                                        check = QCheckBox()
+                                        check.setChecked(bit_description['def_state'])
+                                        check.bit_num = bit_description['bit_num']
+                                        self.cmdtree.setIndexWidget(bit_widget_index, check)
+                                        self.mapper.setMapping(check, str(i))
+                                        check.stateChanged.connect(self.mapper.map)
 
-                                elif bit_description['type'] == 'bit_num':
-                                    pass
+                                    elif bit_description['type'] == 'bit_num':
+                                        pass
+                    except KeyError as e:
+                        logger.error(f'Parse error: CMD \'{cmd_name}\' in byte \'{byte_name}\' \n'
+                                     f' key error: {e.args}')
 
         self.mapper.mapped[str].connect(self.description_widget_data_changed)
         self.mapper.mapped[int].connect(self.btn_send_pressed)
@@ -521,7 +523,6 @@ class CmdCreatorWidget(QWidget):
         self.model.clear()
         self.cmdtree.setDisabled(True)
 
-
     def del_byte(self):
         item_name = self.cmdtree.currentIndex().data()
         if item_name == "Command num":
@@ -534,7 +535,6 @@ class CmdCreatorWidget(QWidget):
                 logger.debug(f'From \'{self.cmd_name}\' delete item \'{item_name}\'')
                 del self.cmd[self.cmd_name][item_name]
                 self.fill_tree()
-
 
     def add_byte(self):
         if self.cmd != {}:
