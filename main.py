@@ -12,6 +12,7 @@ import dialog_con_type
 from Command_module import *
 from utility import *
 import new
+import qdarktheme
 
 
 class MainWindow(QMainWindow):
@@ -19,7 +20,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.resize(1000, 800)
-        self.setWindowTitle('Connection Master v0.3.1')
+        self.setWindowTitle('Connection Master v0.3.2')
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
 
@@ -31,6 +32,7 @@ class MainWindow(QMainWindow):
         self.file_menu = self.menuBar().addMenu('&File')
         self.view_menu = self.menuBar().addMenu("&View")
         self.con_type_menu = self.menuBar().addMenu("&Connection type")
+        self.theme_menu = self.menuBar().addMenu("&Theme")
 
         self.create_cmd_viewer_docker()
         self.create_con_interface()
@@ -58,18 +60,12 @@ class MainWindow(QMainWindow):
         self.con_type_menu.addAction('Serial').setCheckable(True)
         self.con_type_menu.addAction('Ethernet').setCheckable(True)
         self.con_type_menu.actions()[0].setChecked(True)
+        for theme in qdarktheme.get_themes():
+            self.theme_menu.addAction(theme).setCheckable(True)
+        self.theme_menu.actions()[0].setChecked(True)
+        self.theme_menu.triggered.connect(self.set_new_theme)
 
     def create_con_interface(self):
-        # popup window for choose connection type
-        # self.settings_ui = dialog_con_type.Ui_Dialog()
-        # self.settings_dialog = QDialog()
-        # self.settings_ui.setupUi(self.settings_dialog)
-        # self.settings_dialog.show()
-        # self.inteface_widget = ethernet_widget.Widget()
-        # state = self.settings_dialog.exec()
-        # if state == QDialog.Accepted:
-        #     if self.settings_ui.cb_parity.currentText() == 'Serial':
-        #         self.inteface_widget = serialport_widget.Widget()
         self.inteface_widget = serialport_widget.Widget()
         self.setCentralWidget(self.inteface_widget)
 
@@ -87,6 +83,15 @@ class MainWindow(QMainWindow):
             self.inteface_widget = serialport_widget.Widget()
 
         self.setCentralWidget(self.inteface_widget)
+
+    @pyqtSlot(QAction)
+    def set_new_theme(self, action: QAction):
+        for act in self.theme_menu.actions():
+            act.setChecked(False)
+        action.setChecked(True)
+        stylesheet = qdarktheme.load_stylesheet(action.text())
+        QApplication.instance().setStyleSheet(stylesheet)
+
 
     def create_cmd_viewer_docker(self):
         self.cmd_viewer = CmdViewerWidget()
@@ -157,8 +162,13 @@ class MainWindow(QMainWindow):
 
 if __name__ == '__main__':
     import sys
+
+    import dark_theme as dth
+
     app = QApplication(sys.argv)
-    app.setStyle('Fusion')
+    app.setStyleSheet(qdarktheme.load_stylesheet())
+    # app.setStyle('Fusion')
+    #app.setStyleSheet(dth.styleSheet)
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
