@@ -209,7 +209,12 @@
             "def_value": 30,
             "min": 30,
             "max": 6000,
-            "step": 1
+            "step": 1,
+            "doc": "Частота настройки приемника в пределах от 30 до 6000 МГц с шагом в 1 МГц"
+        },
+        "doc": {
+            "type": "str",
+            "value": "Simple comment for this commmand.\n Another text"
         }
     },
     "Установка усиления": {

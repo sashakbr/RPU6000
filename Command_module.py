@@ -129,6 +129,7 @@ class CmdViewerWidget(QWidget):
         self.cmd_data.update(cmd)
         self.fill_tree(self.cmd_data)
         self.change_flag = True
+
     def sort_cmds(self):
         if self.cmd_data is not None:
             self.cmd_data = dict(sorted(self.cmd_data.items()))
@@ -195,8 +196,7 @@ class CmdViewerWidget(QWidget):
             for byte_name, byte_description in cmd.items():
                 byte_name_item = QStandardItem(byte_name)
                 byte_value_item = QStandardItem()
-                cmd_name_item.appendRow([byte_name_item, byte_value_item])
-                byte_widget_index = self.model.indexFromItem(byte_value_item)
+
                 if type(byte_description) == dict:
                     try:
                         if byte_description['type'] == 'num':
@@ -205,6 +205,9 @@ class CmdViewerWidget(QWidget):
                             spin.setMaximum(byte_description['max'])
                             spin.setSingleStep(byte_description['step'])
                             spin.setValue(byte_description['def_value'])
+
+                            cmd_name_item.appendRow([byte_name_item, byte_value_item])
+                            byte_widget_index = self.model.indexFromItem(byte_value_item)
                             self.cmdtree.setIndexWidget(byte_widget_index, spin)
                             self.mapper.setMapping(spin, str(i))
                             spin.valueChanged.connect(self.mapper.map)
@@ -213,6 +216,9 @@ class CmdViewerWidget(QWidget):
                             combo = QComboBox()
                             for text_, data_ in byte_description['values'].items():
                                 combo.addItem(text_, data_)
+
+                            cmd_name_item.appendRow([byte_name_item, byte_value_item])
+                            byte_widget_index = self.model.indexFromItem(byte_value_item)
                             self.cmdtree.setIndexWidget(byte_widget_index, combo)
                             self.mapper.setMapping(combo, str(i))
                             combo.currentIndexChanged.connect(self.mapper.map)
@@ -225,16 +231,24 @@ class CmdViewerWidget(QWidget):
                             spin.setDisplayIntegerBase(16)
                             spin.setPrefix('0x')
                             spin.setDisabled(True)
+
+                            cmd_name_item.appendRow([byte_name_item, byte_value_item])
+                            byte_widget_index = self.model.indexFromItem(byte_value_item)
                             self.cmdtree.setIndexWidget(byte_widget_index, spin)
 
                         elif byte_description['type'] == 'bool':
                             check = QCheckBox()
                             check.setChecked(byte_description['def_state'])
+
+                            cmd_name_item.appendRow([byte_name_item, byte_value_item])
+                            byte_widget_index = self.model.indexFromItem(byte_value_item)
                             self.cmdtree.setIndexWidget(byte_widget_index, check)
                             self.mapper.setMapping(check, str(i))
                             check.stateChanged.connect(self.mapper.map)
 
-                        elif byte_description['type'] == 'bit_field':
+                        if byte_description['type'] == 'bit_field':
+                            cmd_name_item.appendRow([byte_name_item, byte_value_item])
+
                             for bit_name, bit_description in byte_description['description'].items():
                                 bit_name_item = QStandardItem(bit_name)
                                 bit_value_item = QStandardItem()
@@ -261,7 +275,29 @@ class CmdViewerWidget(QWidget):
 
                                     elif bit_description['type'] == 'bit_num':
                                         pass
+
+                        elif byte_description['type'] == 'str':
+                            cmd_name_item.setToolTip(byte_description['value'])
+
+                        if 'doc' in byte_description:
+                            byte_name_item.setToolTip(byte_description['doc'])
+
                     except KeyError as e:
+                        font = cmd_name_item.font()
+                        font.setStrikeOut(True)
+                        font.setBold(False)
+                        cmd_name_item.setFont(font)
+                        byte_name_item.setFont(font)
+                        btn_send.setDisabled(True)
+                        btn_send.setStyleSheet('background-color: red;'
+                                               'border-style: outset;'
+                                               'border-width: 1px;'
+                                               'border-radius: 5px;'
+                                               'border-color: beige;'
+                                               'font: bold 12px;'
+                                               'color: white;'
+                                               'padding: 4px;')
+
                         logger.error(f'Parse error: CMD \'{cmd_name}\' in byte \'{byte_name}\' \n'
                                      f' key error: {e.args}')
 
@@ -425,6 +461,14 @@ class CmdCreatorWidget(QWidget):
         layout1.addWidget(self.pb_down_byte)
         self.main_layout.addLayout(layout1)
 
+        lable_te_doc = QLabel('Documentation: ')
+        self.te_doc = QTextEdit()
+        self.te_doc.setMaximumHeight(50)
+        layout_doc = QHBoxLayout()
+        layout_doc.addWidget(lable_te_doc)
+        layout_doc.addWidget(self.te_doc)
+        self.main_layout.addLayout(layout_doc)
+
         self.lw_byte_type = QListWidget()
         self.lw_byte_type.insertItem(0, 'Enum')
         self.lw_byte_type.insertItem(1, 'Bool')
@@ -476,7 +520,12 @@ class CmdCreatorWidget(QWidget):
         self.pb_down_byte.clicked.connect(lambda: self.move_byte('down'))
         self.pb_up_byte.clicked.connect(lambda: self.move_byte('up'))
         self.buttonBox.button(QDialogButtonBox.Cancel).clicked.connect(self.close)
-        self.buttonBox.button(QDialogButtonBox.Ok).clicked.connect(lambda: self.signal_cmd.emit(self.cmd))
+        self.buttonBox.button(QDialogButtonBox.Ok).clicked.connect(self.finish_creating_cmd)
+
+    def finish_creating_cmd(self):
+        if self.te_doc.toPlainText():
+            self.cmd[self.cmd_name]['Command num'].update({'doc': self.te_doc.toPlainText()})
+        self.signal_cmd.emit(self.cmd)
 
     def move_byte(self, direction='up'):
         item = self.cmdtree.currentIndex()
@@ -725,6 +774,14 @@ class WidgetEnum(QWidget):
         layout_3.addWidget(self.pb_clear_list)
         layout_3.addStretch(1)
 
+        lable_te_doc = QLabel('Documentation: ')
+        self.te_doc = QTextEdit()
+        layout_doc = QHBoxLayout()
+        layout_doc.addWidget(lable_te_doc)
+        layout_doc.addWidget(self.te_doc)
+        self.main_layout.addLayout(layout_doc)
+        self.main_layout.addStretch(1)
+
         if self.type_ == 'bit':
             self.btn_ok = QPushButton('Ok')
             self.btn_ok.clicked.connect(self.btn_ok_clicked)
@@ -770,6 +827,8 @@ class WidgetEnum(QWidget):
                     'values': self.items
                 }
         }
+        if self.te_doc.toPlainText():
+            byte_[byte_name].update({'doc': self.te_doc.toPlainText()})
         return byte_
 
     def get_bit_item(self):
@@ -817,6 +876,13 @@ class WidgetBool(QWidget):
         layout_state.addWidget(lable_cb)
         layout_state.addWidget(self.cb_state)
         layout_state.addStretch(1)
+
+        lable_te_doc = QLabel('Documentation: ')
+        self.te_doc = QTextEdit()
+        layout_doc = QHBoxLayout()
+        layout_doc.addWidget(lable_te_doc)
+        layout_doc.addWidget(self.te_doc)
+        self.main_layout.addLayout(layout_doc)
         self.main_layout.addStretch(1)
 
         if self.type_ == 'bit':
@@ -860,6 +926,8 @@ class WidgetBool(QWidget):
                     'def_state': self.cb_state.isChecked()
                 }
         }
+        if self.te_doc.toPlainText():
+            byte_[byte_name].update({'doc': self.te_doc.toPlainText()})
         return byte_
 
     def get_bit_item(self):
@@ -913,6 +981,9 @@ class WidgetNum(QWidget):
         self.sb_step = QSpinBox()
         self.sb_step.setMinimum(1)
 
+        lable_te_doc = QLabel('Documentation: ')
+        self.te_doc = QTextEdit()
+
         self.main_layout.addWidget(lable_name, 0, 0)
         self.main_layout.addWidget(self.te_name, 0, 1)
         self.main_layout.addWidget(lable_sb_max, 1, 0)
@@ -923,6 +994,8 @@ class WidgetNum(QWidget):
         self.main_layout.addWidget(self.sb_def, 3, 1)
         self.main_layout.addWidget(lable_sb_step, 4, 0)
         self.main_layout.addWidget(self.sb_step, 4, 1)
+        self.main_layout.addWidget(lable_te_doc, 5, 0)
+        self.main_layout.addWidget(self.te_doc, 5, 1)
 
     def changed_min(self):
         if self.sb_min.value() > (self.sb_max.value() - self.sb_step.value()):
@@ -969,6 +1042,8 @@ class WidgetNum(QWidget):
                     'step': self.sb_step.value(),
                 }
         }
+        if self.te_doc.toPlainText():
+            byte_[byte_name].update({'doc': self.te_doc.toPlainText()})
         return byte_
 
 
