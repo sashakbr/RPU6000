@@ -20,7 +20,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.resize(1000, 800)
-        self.setWindowTitle('Connection Master v0.3.2')
+        self.setWindowTitle('Connection Master v0.4')
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
 
